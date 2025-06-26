@@ -72,15 +72,15 @@ export function Footer() {
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Mon - Fri</span>
-                <span className="text-gray-600">9:00am - 7:00pm</span>
+                <span className="text-gray-600">9:00am - 6:00pm</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Saturday</span>
-                <span className="text-gray-600">9:00am - 9:00pm</span>
+                <span className="text-gray-600">9:00am - 6:00pm</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Sunday</span>
-                <span className="text-gray-600">9:00am - 9:00pm</span>
+                <span className="text-gray-600">9:00am - 6:00pm</span>
               </div>
             </div>
           </div>

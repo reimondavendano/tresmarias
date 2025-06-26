@@ -11,13 +11,23 @@ interface ServiceSelectionProps {
   onNext: () => void;
 }
 
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  duration: number;
+  image: string;
+  category: string;
+}
+
 export function ServiceSelection({ onNext }: ServiceSelectionProps) {
   const services = useAppSelector((state) => state.services.services);
   const currentBooking = useAppSelector((state) => state.booking.currentBooking);
   const dispatch = useAppDispatch();
   const [selectedService, setSelectedService] = useState(currentBooking.service || '');
 
-  const handleServiceSelect = (service: any) => {
+  const handleServiceSelect = (service: Service) => {
     setSelectedService(service.name);
     dispatch(setCurrentBooking({
       service: service.name,
@@ -51,20 +61,16 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
       </div>
 
       {categories.map((category) => {
-        const categoryServices = services.filter(service => service.category === category.id);
-        
-        if (categoryServices.length === 0) return null;
+        const categoryServices = services.filter((service: Service) => service.category === category.id);
 
+        if (categoryServices.length === 0) return null;
         return (
-          <div key={category.id} className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${category.color}`}>
-                {category.name}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categoryServices.map((service) => (
+          <div key={category.id} className="mb-8">
+            <h3 className={`text-xl font-bold mb-4 px-2 py-1 rounded ${category.color}`}>
+              {category.name}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {categoryServices.map((service: Service) => (
                 <Card
                   key={service.id}
                   className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${

@@ -6,17 +6,25 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAppSelector } from '@/store/hooks';
 
+type Service = {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  duration: number;
+};
+
 export function ServicesSection() {
-  const services = useAppSelector((state) => state.services.services);
+  const services = useAppSelector((state) => state.services.services) as Service[];
 
   return (
     <section id="services" className="py-20 bg-salon-neutral">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="font-display text-4xl md:text-5xl font-bold text-salon-dark mb-4">
-            Our Premium Services
+            Our Services
           </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg text-gray-700 max-w-2xl mx-auto">
             Renowned for excellence in hair rebonding, precision haircuts, and expert nail and foot care — including manicure, pedicure, and relaxing foot spa treatments.
           </p>
         </div>
