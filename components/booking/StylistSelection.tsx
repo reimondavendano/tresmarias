@@ -18,7 +18,7 @@ export function StylistSelection({ onNext, onPrevious }: StylistSelectionProps) 
   const dispatch = useAppDispatch();
   const [selectedStylist, setSelectedStylist] = useState(currentBooking.stylist || '');
 
-  const availableStylists = stylists.filter(stylist => stylist.available);
+  const availableStylists = stylists.filter((stylist: { available: any; }) => stylist.available);
 
   const handleStylistSelect = (stylist: any) => {
     setSelectedStylist(stylist.name);
@@ -76,7 +76,7 @@ export function StylistSelection({ onNext, onPrevious }: StylistSelectionProps) 
 
       {/* Individual Stylists */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {availableStylists.map((stylist) => (
+        {availableStylists.map((stylist : any) => (
           <Card
             key={stylist.id}
             className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${
@@ -110,7 +110,7 @@ export function StylistSelection({ onNext, onPrevious }: StylistSelectionProps) 
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {stylist.specialties.map((specialty) => (
+                    {stylist.specialties.map((specialty : any) => (
                       <span
                         key={specialty}
                         className="px-2 py-1 bg-white text-salon-dark text-xs rounded-full border border-salon-primary/20"
