@@ -5,7 +5,7 @@ import { ReduxProvider } from '@/components/providers/ReduxProvider';
 import { Toaster } from '@/components/ui/sonner';
 
 const open = Open_Sans({ subsets: ['latin'], variable: '--font-inter' });
-const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
+
 
 export const metadata: Metadata = {
   title: 'Tres Duos - Tres Marias Salon',
@@ -19,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${open.variable} ${playfair.variable} font-sans`}>
+      <body className={`${open.variable} font-sans`}>
         <ReduxProvider>
           {children}
           <Toaster />
