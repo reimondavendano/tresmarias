@@ -67,9 +67,9 @@ const servicesSlice = createSlice({
         state.isLoadingServices = true;
         state.errorServices = null;
       })
-      .addCase(fetchServices.fulfilled, (state, action: PayloadAction<Service[]>) => {
+      .addCase(fetchServices.fulfilled, (state, action: PayloadAction<Service[] | null>) => {
         state.isLoadingServices = false;
-        state.services = action.payload; // Update services with fetched data
+        state.services = action.payload ?? []; // Ensure stylists is always an array
         state.errorServices = null; // Clear any previous error
       })
       .addCase(fetchServices.rejected, (state, action) => {
@@ -82,9 +82,9 @@ const servicesSlice = createSlice({
         state.isLoadingStylists = true;
         state.errorStylists = null;
       })
-      .addCase(fetchStylists.fulfilled, (state, action: PayloadAction<Stylist[]>) => {
+      .addCase(fetchStylists.fulfilled, (state, action: PayloadAction<Stylist[] | null>) => {
         state.isLoadingStylists = false;
-        state.stylists = action.payload; // Update stylists with fetched data
+        state.stylists = action.payload ?? []; // Ensure stylists is always an array
         state.errorStylists = null; // Clear any previous error
       })
       .addCase(fetchStylists.rejected, (state, action) => {
