@@ -170,7 +170,7 @@ export function StylistSelection({ onNext, onPrevious }: StylistSelectionProps) 
                       </span>
                       <Award className="h-4 w-4 text-salon-primary ml-3" />
                       <span className="ml-1 text-sm text-gray-600">
-                        {stylist.experience_years} years exp {/* Corrected property name */}
+                        {stylist.experience_years} years exp
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1">

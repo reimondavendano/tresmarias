@@ -2,66 +2,109 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { DollarSign, TrendingUp, Calendar, CreditCard } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, CreditCard, Loader2 } from 'lucide-react'; // Added Loader2
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks'; // Import useAppDispatch
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { RevenueChart } from '@/components/admin/RevenueChart';
+import { fetchBookings } from '@/store/slices/bookingSlice'; // Import fetchBookings
+import { Booking } from '@/types'; // Import Booking type
 
 export default function AdminRevenuePage() {
   const isAuthenticated = useAppSelector((state) => state.admin.isAuthenticated);
   const bookings = useAppSelector((state) => state.booking.bookings);
+  const isLoadingBookings = useAppSelector((state) => state.booking.isLoading); // Get loading state
+  const errorBookings = useAppSelector((state) => state.booking.error); // Get error state
+  const dispatch = useAppDispatch(); // Initialize dispatch
   const router = useRouter();
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/admin/login');
+    } else {
+      // Fetch bookings when the component mounts and user is authenticated
+      dispatch(fetchBookings(20));
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, dispatch]);
 
   if (!isAuthenticated) {
     return null;
   }
 
+  // Show loading state for bookings
+  if (isLoadingBookings) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin mr-3 text-salon-primary" />
+          Loading revenue data...
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  // Show error state for bookings
+  if (errorBookings) {
+    return (
+      <AdminLayout>
+        <div className="text-center text-red-600 p-4">
+          Error loading revenue data: {errorBookings}
+        </div>
+      </AdminLayout>
+    );
+  }
+
   // Calculate revenue metrics
-  const totalRevenue = bookings.reduce((sum, booking) => sum + booking.price, 0);
+  const totalRevenue = bookings.reduce((sum, booking) => sum + (booking.total_amount || 0), 0);
   const confirmedRevenue = bookings
-    .filter(booking => booking.status === 'confirmed')
-    .reduce((sum, booking) => sum + booking.price, 0);
+    .filter(booking => booking.status === 'confirmed' || booking.status === 'completed') // Include completed in confirmed revenue
+    .reduce((sum, booking) => sum + (booking.total_amount || 0), 0);
   const pendingRevenue = bookings
     .filter(booking => booking.status === 'pending')
-    .reduce((sum, booking) => sum + booking.price, 0);
+    .reduce((sum, booking) => sum + (booking.total_amount || 0), 0);
   const completedRevenue = bookings
     .filter(booking => booking.status === 'completed')
-    .reduce((sum, booking) => sum + booking.price, 0);
+    .reduce((sum, booking) => sum + (booking.total_amount || 0), 0);
+
+  // Placeholder for change percentages - these would typically come from a comparison with previous period data
+  const calculateChange = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? '+100%' : '0%';
+    const change = ((current - previous) / previous) * 100;
+    return `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
+  };
+
+  // Dummy previous month data for demonstration (replace with actual data if available)
+  const dummyPreviousMonthTotal = totalRevenue * 0.9; // Assume 10% growth
+  const dummyPreviousMonthConfirmed = confirmedRevenue * 0.92; // Assume 8% growth
+  const dummyPreviousMonthCompleted = completedRevenue * 0.85; // Assume 15% growth
 
   const revenueStats = [
     {
       title: 'Total Revenue',
-      value: `$${totalRevenue.toLocaleString()}`,
-      change: '+12.5%',
-      changeType: 'positive',
+      value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      change: calculateChange(totalRevenue, dummyPreviousMonthTotal),
+      changeType: totalRevenue >= dummyPreviousMonthTotal ? 'positive' : 'negative',
       icon: DollarSign,
     },
     {
       title: 'Confirmed Revenue',
-      value: `$${confirmedRevenue.toLocaleString()}`,
-      change: '+8.2%',
-      changeType: 'positive',
+      value: `$${confirmedRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      change: calculateChange(confirmedRevenue, dummyPreviousMonthConfirmed),
+      changeType: confirmedRevenue >= dummyPreviousMonthConfirmed ? 'positive' : 'negative',
       icon: TrendingUp,
     },
     {
-      title: 'Pending Revenue',
-      value: `$${pendingRevenue.toLocaleString()}`,
-      change: `${bookings.filter(b => b.status === 'pending').length} bookings`,
+      title: 'Pending Bookings', // Changed title to reflect count, not revenue
+      value: `${bookings.filter(b => b.status === 'pending').length} bookings`, // Display count
+      change: `Worth $${pendingRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, // Show worth
       changeType: 'neutral',
       icon: Calendar,
     },
     {
       title: 'Completed Revenue',
-      value: `$${completedRevenue.toLocaleString()}`,
-      change: '+15.3%',
-      changeType: 'positive',
+      value: `$${completedRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      change: calculateChange(completedRevenue, dummyPreviousMonthCompleted),
+      changeType: completedRevenue >= dummyPreviousMonthCompleted ? 'positive' : 'negative',
       icon: CreditCard,
     },
   ];
@@ -91,13 +134,13 @@ export default function AdminRevenuePage() {
               <CardContent>
                 <div className="text-2xl font-bold text-salon-dark">{stat.value}</div>
                 <p className={`text-xs ${
-                  stat.changeType === 'positive' 
-                    ? 'text-green-600' 
+                  stat.changeType === 'positive'
+                    ? 'text-green-600'
                     : stat.changeType === 'negative'
                     ? 'text-red-600'
                     : 'text-gray-600'
                 }`}>
-                  {stat.change} from last month
+                  {stat.change} {stat.title.includes('Pending') ? '' : 'from last month'} {/* Adjusted text for pending */}
                 </p>
               </CardContent>
             </Card>
@@ -106,8 +149,9 @@ export default function AdminRevenuePage() {
 
         {/* Revenue Chart */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* You'll need to pass dynamic data to RevenueChart if it expects it */}
           <RevenueChart />
-          
+
           {/* Recent High-Value Bookings */}
           <Card>
             <CardHeader>
@@ -116,22 +160,25 @@ export default function AdminRevenuePage() {
             <CardContent>
               <div className="space-y-4">
                 {bookings
-                  .filter(booking => booking.price >= 200)
+                  .filter((booking: Booking) => (booking.total_amount || 0) >= 200) // Access total_amount
                   .slice(0, 5)
-                  .map((booking) => (
+                  .map((booking: Booking) => (
                     <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex-1">
-                        <p className="font-medium text-salon-dark">{booking.customerName}</p>
-                        <p className="text-sm text-gray-600">{booking.service}</p>
-                        <p className="text-xs text-gray-500">{booking.date}</p>
+                        <p className="font-medium text-salon-dark">{booking.customer?.name || 'N/A'}</p> {/* Access nested customer name */}
+                        <p className="text-sm text-gray-600">{booking.service?.name || 'N/A'}</p> {/* Access nested service name */}
+                        <p className="text-xs text-gray-500">{new Date(booking.booking_date).toLocaleDateString()}</p> {/* Use booking_date */}
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-salon-primary text-lg">${booking.price}</p>
+                        <p className="font-semibold text-salon-primary text-lg">${(booking.total_amount || 0).toFixed(2)}</p> {/* Access total_amount */}
                         <p className="text-xs text-gray-500">{booking.status}</p>
                       </div>
                     </div>
                   ))}
               </div>
+              {bookings.filter((booking: Booking) => (booking.total_amount || 0) >= 200).length === 0 && (
+                <p className="text-center text-gray-500 mt-4">No high-value bookings found.</p>
+              )}
             </CardContent>
           </Card>
         </div>

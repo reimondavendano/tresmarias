@@ -3,9 +3,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppSelector } from '@/store/hooks';
+import { Booking } from '@/types'; // Import the Booking type
 
 export function RecentBookings() {
   const bookings = useAppSelector((state) => state.booking.bookings);
+  // Slice to get only the most recent 5 bookings
   const recentBookings = bookings.slice(0, 5);
 
   const getStatusColor = (status: string) => {
@@ -23,6 +25,15 @@ export function RecentBookings() {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -30,21 +41,27 @@ export function RecentBookings() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recentBookings.map((booking) => (
-            <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex-1">
-                <p className="font-medium text-salon-dark">{booking.customerName}</p>
-                <p className="text-sm text-gray-600">{booking.service}</p>
-                <p className="text-xs text-gray-500">{booking.date} at {booking.time}</p>
+          {recentBookings.length > 0 ? (
+            recentBookings.map((booking: Booking) => ( // Explicitly type booking
+              <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <p className="font-medium text-salon-dark">{booking.customer?.name || 'N/A'}</p> {/* Access nested customer name */}
+                  <p className="text-sm text-gray-600">{booking.service?.name || 'N/A'}</p> {/* Access nested service name */}
+                  <p className="text-xs text-gray-500">
+                    {formatDate(booking.booking_date)} at {booking.booking_time} {/* Use booking_date and booking_time */}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Badge className={getStatusColor(booking.status)}>
+                    {booking.status}
+                  </Badge>
+                  <p className="font-semibold text-salon-primary">${(booking.total_amount || 0).toFixed(2)}</p> {/* Access total_amount */}
+                </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <Badge className={getStatusColor(booking.status)}>
-                  {booking.status}
-                </Badge>
-                <p className="font-semibold text-salon-primary">${booking.price}</p>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-center text-gray-500 mt-4">No recent bookings found.</p>
+          )}
         </div>
       </CardContent>
     </Card>

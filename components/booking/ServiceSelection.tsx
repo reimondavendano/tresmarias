@@ -139,7 +139,7 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                 >
                   <div className="aspect-w-16 aspect-h-12 overflow-hidden rounded-t-lg">
                     <img
-                      src={service.image}
+                      src={service.image ? `/assets/services/${service.image}` : 'https://placehold.co/400x300/E0E7FF/4338CA?text=Service%20Image'}
                       alt={service.name}
                       className="w-full h-32 object-cover"
                       onError={(e) => {
