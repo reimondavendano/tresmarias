@@ -1,17 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, User, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setCurrentBooking, addBooking } from '@/store/slices/bookingSlice';
+import { setCurrentBooking, createBooking, clearCurrentBooking } from '@/store/slices/bookingSlice';
 import { ServiceSelection } from '@/components/booking/ServiceSelection';
 import { StylistSelection } from '@/components/booking/StylistSelection';
 import { DateTimeSelection } from '@/components/booking/DateTimeSelection';
 import { CustomerDetails } from '@/components/booking/CustomerDetails';
 import { BookingSummary } from '@/components/booking/BookingSummary';
+import { BookingData } from '@/types';
 
 const steps = [
   { id: 1, name: 'Service', icon: Calendar },
@@ -24,6 +24,7 @@ const steps = [
 export default function BookingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const currentBooking = useAppSelector((state) => state.booking.currentBooking);
+  const { isCreating, createError } = useAppSelector((state) => state.booking);
   const dispatch = useAppDispatch();
 
   const handleNext = () => {
@@ -38,24 +39,38 @@ export default function BookingPage() {
     }
   };
 
-  const handleComplete = () => {
-    const booking = {
-      id: Math.random().toString(36).substr(2, 9),
-      customerName: currentBooking.customerName || '',
-      email: currentBooking.email || '',
-      phone: currentBooking.phone || '',
-      service: currentBooking.service || '',
-      stylist: currentBooking.stylist || '',
-      date: currentBooking.date || '',
-      time: currentBooking.time || '',
-      price: currentBooking.price || 0,
-      status: 'pending' as const,
-      createdAt: new Date().toISOString(),
+  const handleComplete = async () => {
+    // Ensure all required fields are present and correctly typed
+    const bookingData: BookingData = {
+      service_id: currentBooking.service_id || '',
+      booking_date: currentBooking.booking_date || '',
+      booking_time: currentBooking.booking_time || '',
+      customer_name: currentBooking.customer_name || '',
+      customer_email: currentBooking.customer_email || '',
+      customer_phone: currentBooking.customer_phone || '',
+      total_amount: currentBooking.total_amount || 0,
+      customer_id: currentBooking.customer_id || '', // Ensure customer_id is included
+      // Optional fields, provide default undefined if not present
+      stylist_id: currentBooking.stylist_id || undefined,
+      special_requests: currentBooking.special_requests || undefined
     };
 
-    dispatch(addBooking(booking));
-    // Redirect to confirmation or home page
-    window.location.href = '/booking/confirmation';
+    // Log the bookingData to inspect its contents before dispatching
+    console.log('Booking Data to be sent:', bookingData);
+
+    // Dispatch the createBooking async thunk
+    const resultAction = await dispatch(createBooking(bookingData));
+
+    // Check if the booking creation was successful
+    if (createBooking.fulfilled.match(resultAction)) {
+      dispatch(clearCurrentBooking()); // Clear the current booking state
+      // Redirect to confirmation or home page on success
+      window.location.href = '/booking/confirmation';
+    } else {
+      // Handle error, e.g., display a message to the user
+      console.error('Failed to create booking:', createError || 'An unknown error occurred.');
+      // You might want to show a user-friendly error message here
+    }
   };
 
   const renderStepContent = () => {
@@ -69,7 +84,7 @@ export default function BookingPage() {
       case 4:
         return <CustomerDetails onNext={handleNext} onPrevious={handlePrevious} />;
       case 5:
-        return <BookingSummary onComplete={handleComplete} onPrevious={handlePrevious} />;
+        return <BookingSummary onComplete={handleComplete} onPrevious={handlePrevious} isCreating={isCreating} />;
       default:
         return null;
     }
@@ -81,10 +96,10 @@ export default function BookingPage() {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center text-salon-primary hover:text-salon-dark">
+            <a href="/" className="flex items-center text-salon-primary hover:text-salon-dark">
               <ArrowLeft className="h-5 w-5 mr-2" />
               Back to Home
-            </Link>
+            </a>
             <h1 className="font-display text-2xl font-bold text-salon-dark">
               Book Your Appointment
             </h1>
@@ -143,6 +158,28 @@ export default function BookingPage() {
       {/* Step Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderStepContent()}
+        {isCreating && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg flex items-center">
+              <svg className="animate-spin h-5 w-5 mr-3 text-salon-primary" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Creating your booking...</span>
+            </div>
+          </div>
+        )}
+        {createError && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <strong className="font-bold">Error!</strong>
+              <span className="block sm:inline"> {createError}</span>
+              <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => dispatch(clearCurrentBooking())}>
+                <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.697l-2.651 2.652a1.2 1.2 0 1 1-1.697-1.697L8.303 10 5.651 7.348a1.2 1.2 0 1 1 1.697-1.697L10 8.303l2.651-2.652a1.2 1.2 0 0 1 1.697 1.697L11.697 10l2.651 2.651a1.2 1.2 0 0 1 0 1.698z"/></svg>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

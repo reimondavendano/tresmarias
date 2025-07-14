@@ -1,37 +1,72 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Clock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setCurrentBooking } from '@/store/slices/bookingSlice';
+import { fetchServices } from '@/store/slices/servicesSlice';
+import { Service } from '@/types';
 
 interface ServiceSelectionProps {
   onNext: () => void;
 }
 
-interface Service {
-  id: string;
-  name: string;
-  price: number;
-  description: string;
-  duration: number;
-  image: string;
-  category: string;
-}
-
 export function ServiceSelection({ onNext }: ServiceSelectionProps) {
-  const services = useAppSelector((state) => state.services.services);
-  const currentBooking = useAppSelector((state) => state.booking.currentBooking);
   const dispatch = useAppDispatch();
-  const [selectedService, setSelectedService] = useState(currentBooking.service || '');
+  const services = useAppSelector((state) => state.services.services);
+  const isLoadingServices = useAppSelector((state) => state.services.isLoadingServices);
+  const errorServices = useAppSelector((state) => state.services.errorServices);
+  const currentBooking = useAppSelector((state) => state.booking.currentBooking);
+
+  const [selectedService, setSelectedService] = useState<Service | null>(
+    currentBooking.service_id
+      ? services.find(s => s.id === currentBooking.service_id) || null
+      : null
+  );
+
+  useEffect(() => {
+    dispatch(fetchServices());
+  }, [dispatch]);
+
+  // Dynamically generate categories based on fetched services
+  const dynamicCategories = Array.from(new Set(services.map(service => service.category)))
+    .map(category => {
+      let color = 'bg-gray-100 text-gray-800'; // Default color
+      let name = category; // Default name, can be refined
+
+      switch (category) {
+        case 'hair':
+          name = 'Hair Services';
+          color = 'bg-pink-100 text-pink-800';
+          break;
+        case 'facial':
+          name = 'Facial Treatments';
+          color = 'bg-purple-100 text-purple-800';
+          break;
+        case 'nails':
+          name = 'Nail Care';
+          color = 'bg-blue-100 text-blue-800';
+          break;
+        case 'foot':
+          name = 'Footspa';
+          color = 'bg-green-100 text-green-800';
+          break;
+        // Add more cases for other specific categories if needed
+        default:
+          // Capitalize the first letter for unknown categories
+          name = category.charAt(0).toUpperCase() + category.slice(1) + ' Services';
+          break;
+      }
+      return { id: category, name, color };
+    });
 
   const handleServiceSelect = (service: Service) => {
-    setSelectedService(service.name);
+    setSelectedService(service);
     dispatch(setCurrentBooking({
-      service: service.name,
-      price: service.price,
+      service_id: service.id,
+      total_amount: service.price,
     }));
   };
 
@@ -41,12 +76,33 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
     }
   };
 
-  const categories = [
-    { id: 'hair', name: 'Hair Services', color: 'bg-pink-100 text-pink-800' },
-    { id: 'facial', name: 'Facial Treatments', color: 'bg-purple-100 text-purple-800' },
-    { id: 'nails', name: 'Nail Care', color: 'bg-blue-100 text-blue-800' },
-    { id: 'foot', name: 'Footspa', color: 'bg-green-100 text-green-800' },
-  ];
+  if (isLoadingServices) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <svg className="animate-spin h-8 w-8 mr-3 text-salon-primary" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Loading services...
+      </div>
+    );
+  }
+
+  if (errorServices) {
+    return (
+      <div className="text-center text-red-600 p-4">
+        Error loading services: {errorServices}
+      </div>
+    );
+  }
+
+  if (services.length === 0) {
+    return (
+      <div className="text-center text-gray-600 p-4">
+        No services available at the moment. Please check back later!
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -55,12 +111,13 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
           Choose Your Service
         </h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
-          Select from our range of premium beauty and wellness services. 
+          Select from our range of premium beauty and wellness services.
           Each treatment is designed to provide you with the ultimate luxury experience.
         </p>
       </div>
 
-      {categories.map((category) => {
+      {/* Use dynamicCategories instead of the hardcoded array */}
+      {dynamicCategories.map((category) => {
         const categoryServices = services.filter((service: Service) => service.category === category.id);
 
         if (categoryServices.length === 0) return null;
@@ -74,7 +131,7 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                 <Card
                   key={service.id}
                   className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${
-                    selectedService === service.name
+                    selectedService?.id === service.id
                       ? 'ring-2 ring-salon-primary bg-salon-light'
                       : 'hover:shadow-md'
                   }`}
@@ -85,6 +142,9 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                       src={service.image}
                       alt={service.name}
                       className="w-full h-32 object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://placehold.co/400x300/E0BBE4/FFFFFF?text=${service.name.replace(/\s/g, '+')}`;
+                      }}
                     />
                   </div>
                   <CardContent className="p-6">
@@ -93,7 +153,7 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                         {service.name}
                       </h3>
                       <span className="text-xl font-bold text-salon-primary">
-                        ${service.price}
+                        ${service.price.toFixed(2)}
                       </span>
                     </div>
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">

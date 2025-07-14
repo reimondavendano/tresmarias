@@ -13,7 +13,7 @@ export default function AdminDashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+  if (!isAuthenticated) {
       router.push('/admin/login');
     }
   }, [isAuthenticated, router]);
@@ -33,9 +33,7 @@ export default function AdminDashboardPage() {
             Welcome back! Here's what's happening at your salon today.
           </p>
         </div>
-
         <DashboardStats />
-        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <RevenueChart />
           <RecentBookings />

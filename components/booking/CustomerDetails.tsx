@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, ArrowRight, User, Mail, Phone } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setCurrentBooking } from '@/store/slices/bookingSlice';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, ArrowRight, User, Mail, Phone, Loader2 } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
+import { setCurrentBooking } from '../../store/slices/bookingSlice';
+import { createOrFetchCustomer, clearCustomerError } from '../../store/slices/customerSlice';
+import { Customer } from '../../types'; // Corrected import path for Customer type
 
 interface CustomerDetailsProps {
   onNext: () => void;
@@ -17,22 +19,39 @@ interface CustomerDetailsProps {
 
 export function CustomerDetails({ onNext, onPrevious }: CustomerDetailsProps) {
   const currentBooking = useAppSelector((state) => state.booking.currentBooking);
+  const { isLoadingCustomer, createCustomerError } = useAppSelector((state) => state.customers);
   const dispatch = useAppDispatch();
-  
+
   const [formData, setFormData] = useState({
-    customerName: currentBooking.customerName || '',
-    email: currentBooking.email || '',
-    phone: currentBooking.phone || '',
-    notes: '',
+    customerName: currentBooking.customer_name || '',
+    email: currentBooking.customer_email || '',
+    phone: currentBooking.customer_phone || '',
+    special_requests: currentBooking.special_requests || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    setFormData({
+      customerName: currentBooking.customer_name || '',
+      email: currentBooking.customer_email || '',
+      phone: currentBooking.customer_phone || '',
+      special_requests: currentBooking.special_requests || '',
+    });
+
+    return () => {
+      dispatch(clearCustomerError());
+    };
+  }, [dispatch, currentBooking.customer_name, currentBooking.customer_email, currentBooking.customer_phone, currentBooking.special_requests]);
+
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    dispatch(setCurrentBooking({ [field]: value }));
-    
-    // Clear error when user starts typing
+    if (field === 'customerName') dispatch(setCurrentBooking({ customer_name: value }));
+    if (field === 'email') dispatch(setCurrentBooking({ customer_email: value }));
+    if (field === 'phone') dispatch(setCurrentBooking({ customer_phone: value }));
+    if (field === 'special_requests') dispatch(setCurrentBooking({ special_requests: value }));
+
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -61,9 +80,22 @@ export function CustomerDetails({ onNext, onPrevious }: CustomerDetailsProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (validateForm()) {
-      onNext();
+      dispatch(clearCustomerError());
+      const resultAction = await dispatch(createOrFetchCustomer({
+        name: formData.customerName,
+        email: formData.email,
+        phone: formData.phone,
+      }));
+
+      if (createOrFetchCustomer.fulfilled.match(resultAction)) {
+        const customer: Customer = resultAction.payload;
+        dispatch(setCurrentBooking({ customer_id: customer.id }));
+        onNext();
+      } else {
+        console.error("Failed to create or fetch customer:", createCustomerError);
+      }
     }
   };
 
@@ -74,7 +106,7 @@ export function CustomerDetails({ onNext, onPrevious }: CustomerDetailsProps) {
           Your Details
         </h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
-          Please provide your contact information so we can confirm your appointment 
+          Please provide your contact information so we can confirm your appointment
           and send you important updates.
         </p>
       </div>
@@ -146,23 +178,23 @@ export function CustomerDetails({ onNext, onPrevious }: CustomerDetailsProps) {
 
           {/* Special Requests */}
           <div className="space-y-2">
-            <Label htmlFor="notes" className="text-salon-dark font-medium">
+            <Label htmlFor="special_requests" className="text-salon-dark font-medium">
               Special Requests or Notes (Optional)
             </Label>
             <Textarea
-              id="notes"
+              id="special_requests"
               placeholder="Any special requests, allergies, or preferences you'd like us to know about?"
               rows={4}
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
+              value={formData.special_requests}
+              onChange={(e) => handleInputChange('special_requests', e.target.value)}
             />
           </div>
 
           {/* Privacy Notice */}
           <div className="bg-salon-neutral p-4 rounded-lg">
             <p className="text-sm text-gray-600">
-              <strong>Privacy Notice:</strong> Your personal information will be used only for 
-              appointment scheduling and communication. We respect your privacy and will never 
+              <strong>Privacy Notice:</strong> Your personal information will be used only for
+              appointment scheduling and communication. We respect your privacy and will never
               share your details with third parties.
             </p>
           </div>
@@ -174,6 +206,7 @@ export function CustomerDetails({ onNext, onPrevious }: CustomerDetailsProps) {
           onClick={onPrevious}
           variant="outline"
           size="lg"
+          disabled={isLoadingCustomer}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Date & Time
@@ -182,11 +215,28 @@ export function CustomerDetails({ onNext, onPrevious }: CustomerDetailsProps) {
           onClick={handleNext}
           size="lg"
           className="bg-salon-primary hover:bg-salon-primary/90 text-white"
+          disabled={isLoadingCustomer}
         >
-          Review Booking
-          <ArrowRight className="h-4 w-4 ml-2" />
+          {isLoadingCustomer ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <ArrowRight className="h-4 w-4 ml-2" />
+          )}
+          {isLoadingCustomer ? 'Processing...' : 'Review Booking'}
         </Button>
       </div>
+
+      {createCustomerError && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <strong className="font-bold">Error!</strong>
+            <span className="block sm:inline"> {createCustomerError}</span>
+            <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => dispatch(clearCustomerError())}>
+              <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.697l-2.651 2.652a1.2 1.2 0 1 1-1.697-1.697L8.303 10 5.651 7.348a1.2 1.2 0 1 1 1.697-1.697L10 8.303l2.651-2.652a1.2 1.2 0 0 1 1.697 1.697L11.697 10l2.651 2.651a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

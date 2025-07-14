@@ -1,25 +1,32 @@
+// components/home/ServicesSection.tsx
+// This component displays the services and dispatches Redux thunks to fetch data.
+// It now focuses solely on fetching and displaying services.
+
 'use client';
 
 import Link from 'next/link';
 import { Clock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+// Assuming useAppDispatch and useAppSelector are defined in '@/store/hooks'
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useEffect } from 'react';
+// Import only the fetchServices async thunk
 import { fetchServices } from '@/store/slices/servicesSlice';
+import { RootState } from '@/store/store';
+import { Service } from '@/types';
 
-type Service = {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  duration: number;
-};
 
 export function ServicesSection() {
+  // Use typed hooks for better Redux integration
   const dispatch = useAppDispatch();
-  const { services, isLoadingServices, errorServices } = useAppSelector((state) => state.services);
+  const {
+    services,
+    isLoadingServices,
+    errorServices,
+  } = useAppSelector((state: RootState) => state.services);
 
+  // Fetch services when the component mounts
   useEffect(() => {
     dispatch(fetchServices());
   }, [dispatch]); // Dependency array includes dispatch to ensure effect runs if dispatch changes (though it's stable)
@@ -56,15 +63,15 @@ export function ServicesSection() {
 
         {!isLoadingServices && !errorServices && services.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-            {services.map((service, index) => (
-              <Card 
-                key={service.id} 
+            {services.map((service: Service, index: number) => (
+              <Card
+                key={service.id}
                 className="group hover:shadow-xl transition-all duration-300 border-0 bg-white overflow-hidden"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 <div className="aspect-w-16 aspect-h-12 overflow-hidden">
                   <img
-                    src={service.image}
+                    src={service.image ? `/assets/services/${service.image}` : 'https://placehold.co/400x300/E0E7FF/4338CA?text=Service%20Image'}
                     alt={service.name}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -74,18 +81,20 @@ export function ServicesSection() {
                     <h3 className="font-semibold text-xl text-salon-dark group-hover:text-salon-primary transition-colors">
                       {service.name}
                     </h3>
-                    
                   </div>
                   <p className="text-gray-600 mb-4 line-clamp-2">
                     {service.description}
                   </p>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center text-sm text-gray-500">
-                      <Clock className="h-4 w-4 mr-1" />
-                      {service.duration} mins
+                      
                     </div>
                     <Link href="/booking" className="text-salon-primary hover:text-salon-dark transition-colors">
-                      <ArrowRight className="h-5 w-5" />
+                    <div className="flex items-center text-sm">
+                      View
+                    
+                        <ArrowRight className="h-6 w-6" />
+                      </div>
                     </Link>
                   </div>
                 </CardContent>

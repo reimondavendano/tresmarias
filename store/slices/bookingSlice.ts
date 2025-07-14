@@ -1,93 +1,170 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+// lib/redux/slices/bookingSlice.ts
 
-export interface Booking {
-  id: string;
-  customerName: string;
-  email: string;
-  phone: string;
-  service: string;
-  stylist: string;
-  date: string;
-  time: string;
-  price: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  createdAt: string;
-}
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { Booking, BookingData, BookingStatus } from '@/types';
 
 interface BookingState {
   bookings: Booking[];
-  currentBooking: Partial<Booking>;
+  currentBooking: Partial<BookingData>;
   isLoading: boolean;
+  error: string | null;
+  isCreating: boolean;
+  createError: string | null;
 }
 
 const initialState: BookingState = {
-  bookings: [
-    {
-      id: '1',
-      customerName: 'Sarah Johnson',
-      email: 'sarah@example.com',
-      phone: '+1 (555) 123-4567',
-      service: 'Hair Cut & Styling',
-      stylist: 'Emma Rodriguez',
-      date: '2025-01-20',
-      time: '10:00',
-      price: 120,
-      status: 'confirmed',
-      createdAt: '2025-01-15T09:00:00Z'
-    },
-    {
-      id: '2',
-      customerName: 'Michael Chen',
-      email: 'michael@example.com', 
-      phone: '+1 (555) 987-6543',
-      service: 'Hair Color & Highlights',
-      stylist: 'Sofia Martinez',
-      date: '2025-01-21',
-      time: '14:30',
-      price: 250,
-      status: 'pending',
-      createdAt: '2025-01-16T11:30:00Z'
-    },
-    {
-      id: '3',
-      customerName: 'Jessica Williams',
-      email: 'jessica@example.com',
-      phone: '+1 (555) 456-7890',
-      service: 'Premium Facial Treatment',
-      stylist: 'Isabella Thompson',
-      date: '2025-01-22',
-      time: '16:00',
-      price: 180,
-      status: 'confirmed',
-      createdAt: '2025-01-17T14:15:00Z'
-    }
-  ],
+  bookings: [],
   currentBooking: {},
   isLoading: false,
+  error: null,
+  isCreating: false,
+  createError: null,
 };
+
+// Async thunk for fetching bookings
+export const fetchBookings = createAsyncThunk(
+  'booking/fetchBookings',
+  async (limit: number = 10, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/bookings?limit=${limit}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch bookings');
+      }
+      const data: Booking[] = await response.json();
+      return data;
+    } catch (error: any) {
+      console.error('Redux Thunk Error (fetchBookings):', error);
+      return rejectWithValue(error.message || 'An unknown error occurred while fetching bookings.');
+    }
+  }
+);
+
+// Async thunk for creating a booking
+export const createBooking = createAsyncThunk(
+  'booking/createBooking',
+  async (bookingData: BookingData, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create booking');
+      }
+
+      const data: Booking = await response.json();
+      return data;
+    } catch (error: any) {
+      console.error('Redux Thunk Error (createBooking):', error);
+      return rejectWithValue(error.message || 'An unknown error occurred while creating booking.');
+    }
+  }
+);
+
+
+// Async thunk for updating booking status
+export const updateBookingStatus = createAsyncThunk(
+  'booking/updateBookingStatus',
+  async ({ id, status }: { id: string; status: BookingStatus }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/bookings/${id}`, { // Target specific booking by ID
+        method: 'PUT', // Use PUT for updating an existing resource
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }), // Only send the status to update
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update booking status');
+      }
+      const data: Booking = await response.json(); // API should return the updated booking
+      return data;
+    } catch (error: any) {
+      console.error('Redux Thunk Error (updateBookingStatus):', error);
+      return rejectWithValue(error.message || 'An unknown error occurred while updating booking status.');
+    }
+  }
+);
+
+// Async thunk for checking availability
+export const checkAvailability = createAsyncThunk(
+  'booking/checkAvailability',
+  async ({ date, time, stylistId }: { date: string; time: string; stylistId?: string }, { rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams({ date, time });
+      if (stylistId) params.append('stylistId', stylistId);
+      
+      const response = await fetch(`/api/bookings/check-availability?${params}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to check availability');
+      }
+      
+      const data = await response.json();
+      return data.available;
+    } catch (error: any) {
+      console.error('Redux Thunk Error (checkAvailability):', error);
+      return rejectWithValue(error.message || 'An unknown error occurred while checking availability.');
+    }
+  }
+);
 
 const bookingSlice = createSlice({
   name: 'booking',
   initialState,
   reducers: {
-    setCurrentBooking: (state, action: PayloadAction<Partial<Booking>>) => {
+    setCurrentBooking: (state, action: PayloadAction<Partial<BookingData>>) => {
       state.currentBooking = { ...state.currentBooking, ...action.payload };
     },
     clearCurrentBooking: (state) => {
       state.currentBooking = {};
     },
     addBooking: (state, action: PayloadAction<Booking>) => {
-      state.bookings.push(action.payload);
+      state.bookings.unshift(action.payload); // Add to beginning of array
     },
-    updateBookingStatus: (state, action: PayloadAction<{ id: string; status: Booking['status'] }>) => {
-      const booking = state.bookings.find(b => b.id === action.payload.id);
-      if (booking) {
-        booking.status = action.payload.status;
-      }
+    clearError: (state) => {
+      state.error = null;
+      state.createError = null;
     },
-    setLoading: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = action.payload;
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // --- fetchBookings ---
+      .addCase(fetchBookings.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchBookings.fulfilled, (state, action: PayloadAction<Booking[]>) => {
+        state.isLoading = false;
+        state.bookings = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchBookings.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        state.bookings = [];
+      })
+      // --- createBooking ---
+      .addCase(createBooking.pending, (state) => {
+        state.isCreating = true;
+        state.createError = null;
+      })
+      .addCase(createBooking.fulfilled, (state, action: PayloadAction<Booking>) => {
+        state.isCreating = false;
+        state.bookings.unshift(action.payload); // Add to beginning of array
+        state.createError = null;
+        state.currentBooking = {}; // Clear current booking after successful creation
+      })
+      .addCase(createBooking.rejected, (state, action) => {
+        state.isCreating = false;
+        state.createError = action.payload as string;
+      });
   },
 });
 
@@ -95,8 +172,7 @@ export const {
   setCurrentBooking, 
   clearCurrentBooking, 
   addBooking, 
-  updateBookingStatus, 
-  setLoading 
+  clearError 
 } = bookingSlice.actions;
 
 export default bookingSlice.reducer;

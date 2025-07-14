@@ -1,142 +1,96 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Lock, User, Eye, EyeOff } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useAppDispatch } from '@/store/hooks';
-import { login } from '@/store/slices/adminSlice';
-import { toast } from 'sonner';
+import { LoginForm } from '@/components/auth/LoginForm';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Scissors, Sparkles } from 'lucide-react';
+import { loginAdmin, setAdminAuthenticated } from '@/store/slices/adminSlice';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store/store';
+import jwt from 'jsonwebtoken';
 
 export default function AdminLoginPage() {
-  const [credentials, setCredentials] = useState({
-    username: '',
-    password: '',
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const dispatch = useAppDispatch();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    // Static admin credentials
-    if (credentials.username === 'admin' && credentials.password === 'elegance2025') {
-      dispatch(login(credentials.username));
-      toast.success('Welcome back, Admin!');
+const dispatch = useDispatch<AppDispatch>();
+  useEffect(() => {
+    // Redirect to dashboard if already authenticated
+    const isAuthenticated = localStorage.getItem('adminToken') || sessionStorage.getItem('adminSession');
+    if (isAuthenticated) {
       router.push('/admin/dashboard');
-    } else {
-      toast.error('Invalid credentials. Please try again.');
     }
+  }, [router]);
 
+  // Handle login submission  
+
+  const handleLogin = async (credentials: { username: string; password: string }) => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+      const result = await res.json();
+        if (!res.ok || !result.success) {
+          setError(result.error || result.message || 'Invalid username or password');
+        } else {
+          dispatch(setAdminAuthenticated(true)); // <-- set Redux state
+          router.push('/admin/dashboard');       // <-- redirect
+        }
+    } catch (e) {
+      setError('An error occurred during login');
+    }
     setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-salon-neutral flex items-center justify-center py-12">
-      <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="mb-8">
-          <Link href="/" className="flex items-center text-salon-primary hover:text-salon-dark mb-8">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Home
-          </Link>
-          
-          <div className="text-center">
-            <div className="mx-auto w-16 h-16 bg-salon-primary rounded-full flex items-center justify-center mb-4">
-              <Lock className="h-8 w-8 text-white" />
-            </div>
-            <h1 className="font-display text-3xl font-bold text-salon-dark mb-2">
-              Admin Access
-            </h1>
-            <p className="text-gray-600">
-              Please sign in to access the admin dashboard
-            </p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 flex items-center justify-center p-4">
+      <div 
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: 'url(/assets/img/header.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="absolute inset-0 bg-salon-gradient opacity-40"></div>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center text-salon-primary">
-              Salon Management System
+      <div className="w-full max-w-md">
+        <Card className="border-purple-200 shadow-2xl bg-white/95 backdrop-blur-sm">
+          <CardHeader className="text-center pb-8">
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <Scissors className="h-16 w-16 text-purple-600 animate-float" />
+                <Sparkles className="h-6 w-6 text-pink-500 absolute -top-1 -right-1 animate-pulse" />
+              </div>
+            </div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Admin Login
             </CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              Sign in to access the Tres Marias admin dashboard
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-salon-dark font-medium">
-                  Username
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
-                    className="pl-10"
-                    value={credentials.username}
-                    onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-                    required
-                  />
-                </div>
+          <CardContent className="px-8 pb-8">
+             {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-salon-dark font-medium">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    className="pl-10 pr-10"
-                    value={credentials.password}
-                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-salon-primary hover:bg-salon-primary/90 text-white"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </form>
-
-            <div className="mt-6 p-4 bg-salon-light rounded-lg">
-              <p className="text-sm text-center text-gray-600 mb-2">
-                <strong>Demo Credentials:</strong>
-              </p>
-              <p className="text-xs text-center text-gray-500">
-                Username: <code className="bg-white px-1 rounded">admin</code><br />
-                Password: <code className="bg-white px-1 rounded">elegance2025</code>
-              </p>
-            </div>
+            )}
+            <LoginForm 
+              onSubmit={handleLogin}
+              isLoading={isLoading}
+            />
           </CardContent>
         </Card>
-
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            Authorized personnel only. All access is logged and monitored.
-          </p>
-        </div>
       </div>
     </div>
   );
