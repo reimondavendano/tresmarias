@@ -159,10 +159,10 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                       {service.description}
                     </p>
-                    <div className="flex items-center text-sm text-gray-500">
+                    {/* <div className="flex items-center text-sm text-gray-500">
                       <Clock className="h-4 w-4 mr-1" />
                       {service.duration} minutes
-                    </div>
+                    </div> */}
                   </CardContent>
                 </Card>
               ))}
