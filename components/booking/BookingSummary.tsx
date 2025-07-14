@@ -213,11 +213,11 @@ export function BookingSummary({ onComplete, onPrevious, isCreating }: BookingSu
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Service Price</span>
-              <span className="font-medium text-salon-dark">${currentBooking.total_amount?.toFixed(2) || '0.00'}</span>
+              <span className="font-medium text-salon-dark">P{currentBooking.total_amount?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Tax</span>
-              <span className="font-medium text-salon-dark">$0.00</span>
+              <span className="font-medium text-salon-dark">P0.00</span>
             </div>
             <Separator />
             <div className="flex justify-between items-center text-lg font-bold">

@@ -152,9 +152,9 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                       <h3 className="font-semibold text-lg text-salon-dark">
                         {service.name}
                       </h3>
-                      <span className="text-xl font-bold text-salon-primary">
-                        ${service.price.toFixed(2)}
-                      </span>
+                      {/* <span className="text-xl font-bold text-salon-primary">
+                        P{service.price.toFixed(2)}
+                      </span> */}
                     </div>
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                       {service.description}
