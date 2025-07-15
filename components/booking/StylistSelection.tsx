@@ -151,7 +151,7 @@ export function StylistSelection({ onNext, onPrevious }: StylistSelectionProps) 
                 <div className="flex items-start space-x-4">
                   <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
                     <img
-                      src={stylist.image_url || `https://placehold.co/64x64/E0BBE4/FFFFFF?text=${stylist.name.split(' ').map(n => n[0]).join('')}`} // Use image_url and fallback
+                      src={stylist.image_url || `https://placehold.co/400x400/E0E7FF/4338CA?text=${stylist.name.split(' ').map(n => n[0]).join('')}`}
                       alt={stylist.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
