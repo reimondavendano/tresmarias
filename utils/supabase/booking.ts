@@ -1,7 +1,7 @@
 // utils/supabase/booking.ts
 
 import { supabaseService } from './client/supaBaseClient'; // Assuming your Supabase client setup
-import { Booking, BookingData, BookingStatus } from '../../types'; // Import Booking, BookingData, and BookingStatus types
+import { Booking, BookingData, BookingStatus } from '@/types'; // Import Booking, BookingData, and BookingStatus types
 
 /**
  * Creates a new booking. This function first checks if the customer already exists.
@@ -57,6 +57,10 @@ export const createBooking = async (bookingData: BookingData): Promise<[Booking 
         stylist_id: bookingData.stylist_id || null, // Ensure null for optional stylist_id if undefined
         booking_date: bookingData.booking_date,
         booking_time: bookingData.booking_time,
+        // customer_phone, customer_name, customer_email are part of BookingData but not directly in tbl_bookings
+        // as they are linked via customer_id. customer_phone might be a direct column if needed for quick access.
+        // If customer_phone is expected in tbl_bookings, ensure it's added to your DB schema.
+        // For now, removing direct customer_phone insertion as it's typically in tbl_customers.
         special_requests: bookingData.special_requests || null, // Ensure null for optional special_requests
         total_amount: bookingData.total_amount,
         status: 'pending' // Default status for new bookings
@@ -139,7 +143,6 @@ export const fetchRecentBookings = async (limit: number = 10): Promise<[Booking[
 
 /**
  * Updates an existing booking in the 'tbl_bookings' table.
- * This function now returns the full booking object with joined data after update.
  * @param id The ID of the booking to update.
  * @param updates An object containing the fields to update (e.g., { status: 'confirmed' }).
  */
@@ -148,12 +151,7 @@ export const updateBooking = async (id: string, updates: Partial<Booking>): Prom
     .from('tbl_bookings')
     .update(updates)
     .eq('id', id)
-    .select(`
-      *,
-      customer:tbl_customers(id, name, email, phone),
-      service:tbl_services(id, name, price, duration, image, category),
-      stylist:tbl_stylists(id, name, email, phone, specialties, experience_years, rating, image_url)
-    `) // Include joins to return full booking data
+    .select()
     .single();
   if (error) {
     console.error('Supabase Service Error: Failed to update booking:', error.message);

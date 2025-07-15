@@ -12,6 +12,67 @@ const data = [
   { name: 'Jun', revenue: 13200 },
 ];
 
+// Chart.js options
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false, // Allows the chart to fill its container
+    plugins: {
+      legend: {
+        position: 'top' as const,
+        labels: {
+          color: '#cc145bff', // text-gray-700
+        }
+      },
+      title: {
+        display: false, // Title is handled by CardTitle
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += `P${context.parsed.y.toLocaleString()}`;
+            }
+            return label;
+          }
+        },
+        backgroundColor: '#fff',
+        bodyColor: '#cc145bff',
+        titleColor: '#cc145bff',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 10,
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false, // Hide vertical grid lines
+          borderColor: '#e5e7eb', // Border color for x-axis
+        },
+        ticks: {
+          color: '#6b7280', // text-gray-600
+        },
+      },
+      y: {
+        grid: {
+          borderColor: '#e5e7eb', // Border color for y-axis
+          color: '#e5e7eb', // Grid line color
+        },
+        ticks: {
+          color: '#6b7280', // text-gray-600
+          callback: function(value: any) {
+            return `P${value.toLocaleString()}`; // Format Y-axis labels as Philippine Peso
+          }
+        },
+      },
+    },
+  };
+
 export function RevenueChart() {
   return (
     <Card>

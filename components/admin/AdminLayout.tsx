@@ -1,26 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  DollarSign, 
-  Users, 
-  Settings, 
-  LogOut, 
-  Menu, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  Settings,
+  LogOut,
+  Menu,
   X,
-  Sparkles 
+  Sparkles,
+  PhilippinePeso,
+  Scissors,
+  PersonStanding
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { useRouter, usePathname  } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Bookings', href: '/admin/bookings', icon: Calendar },
-  { name: 'Revenue', href: '/admin/revenue', icon: DollarSign },
+  { name: 'Services', href: '/admin/services', icon: Scissors },
+  { name: 'Stylist', href: '/admin/stylists', icon: PersonStanding },
   { name: 'Customers', href: '/admin/customers', icon: Users },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
@@ -38,7 +41,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     // Clear any stored authentication data
     localStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminSession');
-    
+
     toast.success('Logged out successfully');
     router.push('/admin/login');
   };
@@ -48,9 +51,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     setSidebarOpen(false);
   };
 
- // This is the corrected function
+  // This is the corrected function for active routes
   const isActiveRoute = (href: string) => {
-    return pathname === href;
+    // If pathname is null or undefined, no route can be active
+    if (!pathname) {
+      return false;
+    }
+
+    // For the root path, check for exact match
+    if (href === '/admin/dashboard') {
+      return pathname === href;
+    }
+    // For other paths, check if the pathname starts with the href
+    // This handles sub-routes like /admin/services/new
+    return pathname.startsWith(href);
   };
 
 
@@ -59,15 +73,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Mobile menu overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div 
-            className="fixed inset-0 bg-black/20" 
-            onClick={() => setSidebarOpen(false)} 
+          <div
+            className="fixed inset-0 bg-black/20"
+            onClick={() => setSidebarOpen(false)}
           />
           <div className="fixed left-0 top-0 bottom-0 w-64 bg-white shadow-xl">
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center space-x-2">
-                <Sparkles className="h-6 w-6 text-blue-600" />
-                <span className="font-bold text-lg text-blue-600">
+                <img src = {`/assets/img/1.jpg`} alt="Tres Marias Logo" className="h-8 w-8" />
+                <span className="font-bold text-lg text-salon-primary">
                   Tres Marias Salon
                 </span>
               </div>
@@ -111,8 +125,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:left-0 lg:top-0 lg:bottom-0 lg:w-64 lg:bg-white lg:border-r lg:block">
         <div className="flex items-center space-x-2 p-6 border-b">
-          <Sparkles className="h-8 w-8 text-blue-600" />
-          <span className="font-bold text-xl text-blue-600">
+          <img src = {`/assets/img/1.jpg`} alt="Tres Marias Logo" className="h-8 w-8" />
+          <span className="font-bold text-xl text-salon-primary">
             Tres Marias Salon
           </span>
         </div>
@@ -123,7 +137,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               onClick={() => handleNavigation(item.href)}
               className={`w-full flex items-center px-6 py-3 text-sm font-medium transition-colors text-left ${
                 isActiveRoute(item.href)
-                  ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600'
+                  ? 'bg-blue-50 text-salon-primary border-r-2 border-blue-600'
                   : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
               }`}
             >
@@ -151,14 +165,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <div className="flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 transition-colors"
+              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-salon-primary transition-colors"
             >
               <Menu className="h-6 w-6" />
             </button>
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => handleNavigation('/')}
-                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                className="text-sm text-salon-primary hover:text-text-salon-primary transition-colors"
               >
                 View Website
               </button>

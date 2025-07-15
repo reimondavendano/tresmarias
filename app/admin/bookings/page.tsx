@@ -119,7 +119,7 @@ export default function AdminBookingsPage() {
       <div className="space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="font-display text-3xl font-bold text-salon-dark">
+            <h1 className="font-display text-3xl font-bold text-salon-primary">
               Booking Management
             </h1>
             <p className="text-gray-600 mt-2">
@@ -197,7 +197,7 @@ export default function AdminBookingsPage() {
 
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-salon-primary">${booking.total_amount?.toFixed(2) || '0.00'}</p> {/* Use total_amount */}
+                        <p className="text-2xl font-bold text-salon-primary">P{booking.total_amount?.toFixed(2) || '0.00'}</p> {/* Use total_amount */}
                         <p className="text-xs text-gray-500">
                           Booked {new Date(booking.created_at).toLocaleDateString()} {/* Use created_at */}
                         </p>

@@ -76,7 +76,7 @@ export function TeamSection() {
             >
               <div className="aspect-square overflow-hidden">
                 <img
-                  src={stylist.image_url ? `/assets/services/${stylist.image_url}` : `https://placehold.co/400x400/E0E7FF/4338CA?text=${stylist.name.split(' ').map(n => n[0]).join('')}`} // Use image_url and add a fallback
+                  src={stylist.image_url || `https://placehold.co/400x400/E0E7FF/4338CA?text=${stylist.name.split(' ').map(n => n[0]).join('')}`} // Use image_url and add a fallback
                   alt={stylist.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />

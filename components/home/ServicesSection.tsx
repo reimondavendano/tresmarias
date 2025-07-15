@@ -71,7 +71,7 @@ export function ServicesSection() {
               >
                 <div className="aspect-w-16 aspect-h-12 overflow-hidden">
                   <img
-                    src={service.image ? `/assets/services/${service.image}` : 'https://placehold.co/400x300/E0E7FF/4338CA?text=Service%20Image'}
+                    src={service.image || 'https://placehold.co/400x300/E0E7FF/4338CA?text=Service%20Image'}
                     alt={service.name}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                   />

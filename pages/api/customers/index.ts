@@ -3,28 +3,35 @@
 // It serves as the server-side endpoint for creating and fetching customer data.
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createCustomer, fetchCustomerByEmail } from '@/utils/supabase/customers'; // Assuming you'll create this service
+import { createCustomer, fetchCustomerByEmail, fetchAllCustomers } from '@/utils/supabase/customers'; // Import fetchAllCustomers
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Handle GET requests to fetch customers by email
+  // Handle GET requests to fetch customers
   if (req.method === 'GET') {
     const { email } = req.query;
 
-    if (!email) {
-      return res.status(400).json({ message: 'Email query parameter is required for GET requests.' });
+    if (email) {
+      // If email is provided, fetch by email
+      const [customers, error] = await fetchCustomerByEmail(email as string);
+
+      if (error) {
+        console.error('API Route Error: GET /api/customers (by email) -', error.message);
+        return res.status(500).json({ message: 'Failed to fetch customer by email', error: error.message });
+      }
+      return res.status(200).json(customers);
+    } else {
+      // If no email is provided, fetch all customers
+      const [customers, error] = await fetchAllCustomers();
+
+      if (error) {
+        console.error('API Route Error: GET /api/customers (all) -', error.message);
+        return res.status(500).json({ message: 'Failed to fetch all customers', error: error.message });
+      }
+      return res.status(200).json(customers);
     }
-
-    const [customers, error] = await fetchCustomerByEmail(email as string);
-
-    if (error) {
-      console.error('API Route Error: GET /api/customers -', error.message);
-      return res.status(500).json({ message: 'Failed to fetch customer', error: error.message });
-    }
-
-    return res.status(200).json(customers);
 
   // Handle POST requests to create a new customer
   } else if (req.method === 'POST') {

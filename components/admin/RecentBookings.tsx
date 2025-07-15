@@ -55,7 +55,7 @@ export function RecentBookings() {
                   <Badge className={getStatusColor(booking.status)}>
                     {booking.status}
                   </Badge>
-                  <p className="font-semibold text-salon-primary">${(booking.total_amount || 0).toFixed(2)}</p> {/* Access total_amount */}
+                  <p className="font-semibold text-salon-primary">P{(booking.total_amount || 0).toFixed(2)}</p> {/* Access total_amount */}
                 </div>
               </div>
             ))

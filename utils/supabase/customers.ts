@@ -41,6 +41,22 @@ export const fetchCustomerById = async (id: string): Promise<[Customer | null, a
 };
 
 /**
+ * Fetches all customers from the 'tbl_customers' table.
+ */
+export const fetchAllCustomers = async (): Promise<[Customer[] | null, any | null]> => {
+  const { data, error } = await supabaseService
+    .from('tbl_customers')
+    .select('*')
+    .order('created_at', { ascending: false }); // Order by creation date for consistency
+
+  if (error) {
+    console.error('Supabase Customer Service Error: Failed to fetch all customers:', error.message);
+    return [null, error];
+  }
+  return [data as Customer[], null];
+};
+
+/**
  * Creates a new customer entry in the 'tbl_customers' table.
  */
 export const createCustomer = async (newCustomer: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<[Customer | null, any | null]> => {

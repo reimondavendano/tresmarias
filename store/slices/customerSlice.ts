@@ -4,6 +4,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Customer } from '@/types'; // Corrected import path for Customer type
 
 interface CustomerState {
+  customers: any;
   currentCustomer: Partial<Customer>;
   isLoadingCustomer: boolean;
   errorCustomer: string | null;
@@ -14,13 +15,14 @@ interface CustomerState {
 }
 
 const initialState: CustomerState = {
-  currentCustomer: {},
-  isLoadingCustomer: false,
-  errorCustomer: null,
-  isCreatingCustomer: false,
-  createCustomerError: null,
-  isFetchingCustomer: false,
-  fetchCustomerError: null,
+    currentCustomer: {},
+    isLoadingCustomer: false,
+    errorCustomer: null,
+    isCreatingCustomer: false,
+    createCustomerError: null,
+    isFetchingCustomer: false,
+    fetchCustomerError: null,
+    customers: undefined
 };
 
 // Async Thunk for creating or fetching a customer
@@ -85,6 +87,25 @@ export const fetchCustomer = createAsyncThunk(
     } catch (error: any) {
       console.error('Redux Thunk Error (fetchCustomer):', error);
       return rejectWithValue(error.message || 'An unknown error occurred while fetching customer.');
+    }
+  }
+);
+
+// New Async Thunk for fetching ALL customers
+export const fetchAllCustomers = createAsyncThunk(
+  'customer/fetchAllCustomers',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/customers'); // This will now fetch all customers
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch all customers');
+      }
+      const data: Customer[] = await response.json();
+      return data;
+    } catch (error: any) {
+      console.error('Redux Thunk Error (fetchAllCustomers):', error);
+      return rejectWithValue(error.message || 'An unknown error occurred while fetching all customers.');
     }
   }
 );
