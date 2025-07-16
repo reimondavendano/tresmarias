@@ -3,13 +3,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Clock, ArrowRight, Tag } from 'lucide-react'; // Added Tag import
+import { Clock, ArrowRight, Tag, Sparkles } from 'lucide-react'; // Added Tag and Sparkles import
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setCurrentBooking } from '@/store/slices/bookingSlice';
 import { fetchServices } from '@/store/slices/servicesSlice';
+import { fetchActiveBanner } from '@/store/slices/serviceBannerSlice'; // Import fetchActiveBanner
 import { Service } from '@/types';
+import { RootState } from '@/store/store'; // Import RootState
+
 
 interface ServiceSelectionProps {
   onNext: () => void;
@@ -22,6 +25,10 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
   const errorServices = useAppSelector((state) => state.services.errorServices);
   const currentBooking = useAppSelector((state) => state.booking.currentBooking);
 
+  // Access active banner from Redux store
+  const { activeBanner, isLoading: isLoadingBanner, error: errorBanner } = useAppSelector((state: RootState) => state.serviceBanner);
+
+
   const [selectedService, setSelectedService] = useState<Service | null>(
     currentBooking.service_id
       ? services.find(s => s.id === currentBooking.service_id) || null
@@ -30,6 +37,7 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
 
   useEffect(() => {
     dispatch(fetchServices());
+    dispatch(fetchActiveBanner()); // Fetch the active banner here too
   }, [dispatch]);
 
   // Dynamically generate categories based on fetched services
@@ -109,6 +117,7 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
 
   return (
     <div className="space-y-8">
+     
       <div className="text-center">
         <h2 className="font-display text-3xl font-bold text-salon-dark mb-4">
           Choose Your Service
@@ -118,6 +127,41 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
           Each treatment is designed to provide you with the ultimate luxury experience.
         </p>
       </div>
+
+       {/* Active Banner Display (Aligned with content) - Corporate Design */}
+      {/* Added condition: activeBanner.title !== "Regular" */}
+      {!isLoadingBanner && !errorBanner && activeBanner && activeBanner.title && activeBanner.title !== "Regular" && (
+        <div className="mb-12 mx-auto max-w-2xl"> {/* Aligned with mx-auto, reduced max-width */}
+          {/* Redesigned banner div to match the "Special Discount" image style */}
+          <div className="relative bg-white p-6 rounded-lg shadow-xl overflow-hidden">
+            {/* Background angled elements */}
+            <div className="absolute inset-0 bg-gray-200 transform -skew-y-3 z-0"></div>
+            <div className="absolute inset-0 bg-gray-800 transform skew-y-3 z-0 opacity-75"></div>
+            <div className="absolute inset-0 bg-salon-primary transform -skew-y-6 z-0 opacity-65"></div>
+
+            {/* Content Container */}
+           
+            <div className="relative z-10 flex items-center py-4"> {/* Changed to flex and items-center */}
+              {/* Added the logo image - aligned left */}
+              <img 
+                src="/assets/img/1.jpg" 
+                alt="Company Logo" 
+                className="w-24 h-24 object-contain mr-6 rounded-full shadow-md flex-shrink-0" // Added mr-6 for spacing, flex-shrink-0
+              />
+              <div className="text-left flex-grow"> {/* Added text-left and flex-grow */}
+                <h3 className="font-display text-2xl md:text-3xl lg:text-4xl font-bold text-white uppercase tracking-wide leading-none">
+                  {activeBanner.title}
+                </h3>
+                {activeBanner.description && (
+                  <p className="text-sm md:text-base text-gray-200 mt-2"> {/* Removed max-w-xl mx-auto */}
+                    {activeBanner.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Use dynamicCategories instead of the hardcoded array */}
       {dynamicCategories.map((category) => {

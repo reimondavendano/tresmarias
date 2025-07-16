@@ -5,7 +5,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, ArrowRight, Tag } from 'lucide-react'; // Import Tag icon for discount
+import { Clock, ArrowRight, Tag, Sparkles } from 'lucide-react'; // Import Tag icon for discount, and Sparkles for flair
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 // Assuming useAppDispatch and useAppSelector are defined in '@/store/hooks'
@@ -13,6 +13,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useEffect } from 'react';
 // Import only the fetchServices async thunk
 import { fetchServices } from '@/store/slices/servicesSlice';
+import { fetchActiveBanner } from '@/store/slices/serviceBannerSlice'; // Import fetchActiveBanner
 import { RootState } from '@/store/store';
 import { Service } from '@/types';
 
@@ -26,14 +27,21 @@ export function ServicesSection() {
     errorServices,
   } = useAppSelector((state: RootState) => state.services);
 
+  // Access active banner from Redux store
+  const { activeBanner, isLoading: isLoadingBanner, error: errorBanner } = useAppSelector((state: RootState) => state.serviceBanner);
+
   // Fetch services when the component mounts
   useEffect(() => {
     dispatch(fetchServices());
+    // Also fetch the active banner when this component mounts
+    dispatch(fetchActiveBanner()); 
   }, [dispatch]);
 
   return (
-    <section id="services" className="py-20 bg-salon-neutral">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="services" className="py-20 bg-salon-neutral relative">
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> {/* Common container for alignment */}
+        
         <div className="text-center mb-16">
           <h2 className="font-display text-4xl md:text-5xl font-bold text-salon-dark mb-4">
             Our Services
@@ -42,6 +50,40 @@ export function ServicesSection() {
             Renowned for excellence in hair rebonding, precision haircuts, and expert nail and foot care — including manicure, pedicure, and relaxing foot spa treatments.
           </p>
         </div>
+
+        {/* Active Banner Display (Aligned with content) - Corporate Design */}
+        {/* Added condition: activeBanner.title !== "Regular" */}
+        {!isLoadingBanner && !errorBanner && activeBanner && activeBanner.title && activeBanner.title !== "Regular" && (
+          <div className="mb-12 mx-auto max-w-2xl"> {/* Aligned with mx-auto, reduced max-width */}
+            {/* Redesigned banner div to match the "Special Discount" image style */}
+            <div className="relative bg-white p-6 rounded-lg shadow-xl overflow-hidden">
+              {/* Background angled elements */}
+              <div className="absolute inset-0 bg-gray-200 transform -skew-y-3 z-0"></div>
+              <div className="absolute inset-0 bg-gray-800 transform skew-y-3 z-0 opacity-75"></div>
+              <div className="absolute inset-0 bg-salon-primary transform -skew-y-6 z-0 opacity-65"></div>
+
+              {/* Content Container */}
+              <div className="relative z-10 flex items-center py-4"> {/* Changed to flex and items-center */}
+                {/* Added the logo image - aligned left */}
+                <img 
+                  src="/assets/img/1.jpg" 
+                  alt="Company Logo" 
+                  className="w-24 h-24 object-contain mr-6 rounded-full shadow-md flex-shrink-0" // Added mr-6 for spacing, flex-shrink-0
+                />
+                <div className="text-left flex-grow"> {/* Added text-left and flex-grow */}
+                  <h3 className="font-display text-2xl md:text-3xl lg:text-4xl font-bold text-white uppercase tracking-wide leading-none">
+                    {activeBanner.title}
+                  </h3>
+                  {activeBanner.description && (
+                    <p className="text-sm md:text-base text-gray-200 mt-2"> {/* Removed max-w-xl mx-auto */}
+                      {activeBanner.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isLoadingServices && (
           <div className="text-center text-salon-primary text-xl mb-8">
@@ -74,7 +116,7 @@ export function ServicesSection() {
                   <div className="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg z-10 flex items-center shadow-md">
                     <Tag className="h-4 w-4 mr-1" /> {/* Using Tag icon */}
                     {/* Display service.discount directly as it's already a percentage value */}
-                    {`${service.discount}% OFF`} 
+                    {`P${service.discount} OFF`} 
                   </div>
                 )}
 
@@ -94,36 +136,6 @@ export function ServicesSection() {
                   <p className="text-gray-600 mb-4 line-clamp-2">
                     {service.description}
                   </p>
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="flex flex-col">
-                      {/* Price Display Logic */}
-                      {typeof service.discount === 'number' && service.discount > 0 ? ( // Updated condition for safety
-                        <>
-                          {/* Original Price (Strikethrough) for discounted items */}
-                          <span className="text-sm text-gray-500 line-through mr-2">
-                            P{service.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                          {/* Total Price (New Price) for discounted items */}
-                          {service.total_price !== undefined && (
-                            <span className="text-lg font-bold text-red-600">
-                              P{service.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          )}
-                          {/* Fallback if total_price is missing but discount exists (should not happen if DB computes) */}
-                          {service.total_price === undefined && (
-                            <span className="text-lg font-bold text-red-600">
-                              P{(service.price * (1 - (service.discount / 100))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        // If no discount or discount is 0, display only total_price (or original price if total_price is absent)
-                        <span className="text-lg font-bold text-salon-dark">
-                          P{(service.total_price !== undefined ? service.total_price : service.price)?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      )}
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             ))}

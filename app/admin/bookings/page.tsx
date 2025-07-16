@@ -141,7 +141,7 @@ export default function AdminBookingsPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2"> {/* Changed to flex-wrap for responsiveness */}
                 {['all', 'pending', 'confirmed', 'cancelled', 'completed'].map((status) => (
                   <Button
                     key={status}
@@ -195,45 +195,49 @@ export default function AdminBookingsPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
+                    <div className="flex flex-col sm:flex-row items-center gap-3 mt-4 lg:mt-0"> {/* Added flex-col sm:flex-row for responsiveness */}
+                      <div className="text-right sm:mr-4"> {/* Added sm:mr-4 for spacing on larger screens */}
                         <p className="text-2xl font-bold text-salon-primary">P{booking.total_amount?.toFixed(2) || '0.00'}</p> {/* Use total_amount */}
                         <p className="text-xs text-gray-500">
                           Booked {new Date(booking.created_at).toLocaleDateString()} {/* Use created_at */}
                         </p>
                       </div>
 
-                      {booking.status === 'pending' && (
-                        <div className="flex gap-2">
+                      {/* Action Buttons for Pending/Confirmed Status */}
+                      <div className="flex gap-2 flex-wrap justify-center sm:justify-end"> {/* Added flex-wrap and justify-center for mobile */}
+                        {booking.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                              className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" // Made full width on mobile
+                              disabled={updatingBookingIds.has(booking.id)} // Disable while updating
+                            >
+                              {updatingBookingIds.has(booking.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                              className="w-full sm:w-auto" // Made full width on mobile
+                              disabled={updatingBookingIds.has(booking.id)} // Disable while updating
+                            >
+                              {updatingBookingIds.has(booking.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                            </Button>
+                          </>
+                        )}
+                        {booking.status === 'confirmed' && ( // Option to mark as completed
                           <Button
                             size="sm"
-                            onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleStatusUpdate(booking.id, 'completed')}
+                            className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" // Made full width on mobile
                             disabled={updatingBookingIds.has(booking.id)} // Disable while updating
                           >
-                            {updatingBookingIds.has(booking.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            {updatingBookingIds.has(booking.id) ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
+                            Complete
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
-                            disabled={updatingBookingIds.has(booking.id)} // Disable while updating
-                          >
-                            {updatingBookingIds.has(booking.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      )}
-                      {booking.status === 'confirmed' && ( // Option to mark as completed
-                        <Button
-                          size="sm"
-                          onClick={() => handleStatusUpdate(booking.id, 'completed')}
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                          disabled={updatingBookingIds.has(booking.id)} // Disable while updating
-                        >
-                          {updatingBookingIds.has(booking.id) ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
-                          Complete
-                        </Button>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>

@@ -5,6 +5,7 @@ import servicesReducer from './slices/servicesSlice';
 import stylistsReducer from './slices/stylistsSlice';
 import customerReducer from './slices/customerSlice'; // Adjust path as necessary
 import galleryReducer from './slices/gallerySlice'; // Adjust path as necessary
+import serviceBannerSlice  from './slices/serviceBannerSlice'; // Import service banner slice
 
 export const store = configureStore({
   reducer: {
@@ -13,7 +14,8 @@ export const store = configureStore({
     stylists: stylistsReducer,
     services: servicesReducer,
     customers: customerReducer, // Add customer slice
-    gallery: galleryReducer
+    gallery: galleryReducer,
+    serviceBanner : serviceBannerSlice, // Import service banner slice
   },
 });
 

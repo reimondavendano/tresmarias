@@ -123,4 +123,15 @@ export interface GalleryImage {
   created_at: string;
 }
 
+/**
+ * New: Interface representing a service banner.
+ */
+export interface ServiceBanner {
+  id: string;
+  title: string;
+  description?: string;
+  image_url: string;
+  is_active: boolean;
+  created_at: string;
+}
 
