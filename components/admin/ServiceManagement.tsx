@@ -12,7 +12,8 @@ import { Service } from '@/types'; // Import your Service type
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { Label }
+ from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -28,7 +29,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { XCircle, PlusCircle, Edit, Trash2, UploadCloud, Loader2 } from 'lucide-react';
+import { XCircle, PlusCircle, Edit, Trash2, UploadCloud, Loader2, Tag } from 'lucide-react'; // Added Tag import
 
 // Import AdminLayout component
 import { AdminLayout } from '@/components/admin/AdminLayout'; // Assuming this path for your AdminLayout
@@ -54,10 +55,11 @@ export default function ServiceManagement() {
     name: '',
     description: '',
     price: 0,
-    duration: 0,
+    duration: 0, // Keep duration in state as it's part of Service type
     category: 'hair',
     image: '', // This will store the URL after upload
     is_active: true,
+    discount: 0, // New: Initialize discount
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -75,7 +77,10 @@ export default function ServiceManagement() {
   // Handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: name === 'price' || name === 'duration' ? Number(value) : value }));
+    setFormData((prev) => ({ 
+      ...prev, 
+      [name]: (name === 'price' || name === 'discount') ? Number(value) : value 
+    }));
   };
 
   // Handle category select change
@@ -143,14 +148,15 @@ export default function ServiceManagement() {
       imageUrl = uploadedUrl; // imageUrl is now guaranteed to be a string
     }
 
-    const serviceDataToSubmit: Omit<Service, 'id' | 'created_at' | 'updated_at'> = {
+    const serviceDataToSubmit: Omit<Service, 'id' | 'created_at' | 'updated_at' | 'total_price'> = { // Omit total_price
       name: formData.name || '',
       description: formData.description || '',
       price: formData.price || 0,
-      duration: formData.duration || 0,
+      duration: formData.duration || 0, // Keep duration here as it's part of the Service type
       category: formData.category || 'other',
       image: imageUrl, // Now imageUrl is guaranteed to be a string
       is_active: formData.is_active ?? true, // Default to true if not set
+      discount: formData.discount || 0, // New: Include discount
     };
 
     if (isEditMode && editingServiceId) {
@@ -220,16 +226,32 @@ export default function ServiceManagement() {
       name: '',
       description: '',
       price: 0,
-      duration: 0,
+      duration: 0, // Reset duration to default
       category: 'hair',
       image: '',
       is_active: true,
+      discount: 0, // New: Reset discount
     });
     setSelectedFile(null);
     setIsEditMode(false);
     setEditingServiceId(null);
     setImageUploadError(null);
     setImageUploadLoading(false);
+  };
+
+  // Function to allow only numbers and specific control keys
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    const charCode = event.which ? event.which : event.keyCode;
+    // Allow numbers (0-9), backspace, delete, tab, arrow keys
+    if (
+      (charCode > 31 && (charCode < 48 || charCode > 57)) && // Not a number
+      charCode !== 8 && // Backspace
+      charCode !== 46 && // Delete
+      charCode !== 9 &&  // Tab
+      !(charCode >= 37 && charCode <= 40) // Arrow keys
+    ) {
+      event.preventDefault();
+    }
   };
 
   return (
@@ -263,11 +285,32 @@ export default function ServiceManagement() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="price" className="text-right">Price</Label>
-                <Input id="price" name="price" type="number" value={formData.price || 0} onChange={handleChange} className="col-span-3" required />
+                <Input 
+                  id="price" 
+                  name="price" 
+                  type="text" // Changed to text
+                  value={formData.price || 0} 
+                  onChange={handleChange} 
+                  onKeyPress={handleKeyPress} // Added onKeyPress
+                  className="col-span-3" 
+                  required 
+                />
               </div>
+
+              {/* New: Discount Input */}
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="duration" className="text-right">Duration (mins)</Label>
-                <Input id="duration" name="duration" type="number" value={formData.duration || 0} onChange={handleChange} className="col-span-3" required />
+                <Label htmlFor="discount" className="text-right">Discount (%)</Label>
+                <Input 
+                  id="discount" 
+                  name="discount" 
+                  type="text" // Changed to text
+                  value={formData.discount || 0} 
+                  onChange={handleChange} 
+                  onKeyPress={handleKeyPress} // Added onKeyPress
+                  className="col-span-3" 
+                  min="0" 
+                  max="100" 
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="category" className="text-right">Category</Label>
@@ -350,6 +393,14 @@ export default function ServiceManagement() {
             {services.map((service) => (
               <Card key={service.id} className="flex flex-col rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300">
                 <div className="relative w-full h-48 bg-gray-200 overflow-hidden flex items-center justify-center">
+                  {/* Discount Tag - Only show if discount is a number and greater than 0 */}
+                  {typeof service.discount === 'number' && service.discount > 0 && (
+                    <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-md z-10 flex items-center shadow-md"> {/* Adjusted position and styling */}
+                      <Tag className="h-3 w-3 mr-1" /> {/* Smaller Tag icon */}
+                      {`${service.discount}% OFF`}
+                    </div>
+                  )}
+
                   {service.image ? (
                     <img
                       src={service.image || 'https://placehold.co/400x300/E0E7FF/4338CA?text=Service%20Image'}
@@ -364,8 +415,36 @@ export default function ServiceManagement() {
                 <CardContent className="p-4 flex-grow">
                   <CardTitle className="text-xl font-semibold text-gray-900 mb-2">{service.name}</CardTitle>
                   <p className="text-gray-700 text-sm mb-2 line-clamp-2">{service.description}</p>
-                  <p className="text-salon-primary font-medium text-lg mb-1">P{service.price.toLocaleString()}</p>
-                  <p className="text-gray-600 text-sm mb-1">Duration: {service.duration} mins</p>
+                  
+                  {/* Price Display Logic */}
+                  <div className="flex items-center gap-2 mb-1">
+                    {typeof service.discount === 'number' && service.discount > 0 ? (
+                      <>
+                        {/* Original Price (Strikethrough) for discounted items */}
+                        <span className="text-base text-gray-500 line-through">
+                          P{service.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {/* Total Price (New Price) for discounted items */}
+                        {service.total_price !== undefined && (
+                          <span className="text-lg font-bold text-red-600">
+                            P{service.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        {/* Fallback if total_price is missing but discount exists (should not happen if DB computes) */}
+                        {service.total_price === undefined && (
+                          <span className="text-lg font-bold text-red-600">
+                            P{(service.price * (1 - (service.discount / 100))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      // If no discount or discount is 0, display only total_price (or original price if total_price is absent)
+                      <span className="text-lg font-bold text-salon-primary">
+                        P{(service.total_price !== undefined ? service.total_price : service.price)?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+
                   <p className="text-gray-600 text-sm mb-3">Category: {service.category}</p>
                 </CardContent>
                 <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">

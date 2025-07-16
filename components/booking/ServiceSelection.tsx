@@ -1,7 +1,9 @@
+// newServiceSelection (renamed to ServiceSelection for clarity)
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Clock, ArrowRight } from 'lucide-react';
+import { Clock, ArrowRight, Tag } from 'lucide-react'; // Added Tag import
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -64,9 +66,10 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
 
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
+    // Use total_price if available, otherwise fallback to price
     dispatch(setCurrentBooking({
       service_id: service.id,
-      total_amount: service.price,
+      total_amount: service.total_price !== undefined ? service.total_price : service.price,
     }));
   };
 
@@ -130,13 +133,21 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
               {categoryServices.map((service: Service) => (
                 <Card
                   key={service.id}
-                  className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                  className={`cursor-pointer transition-all duration-300 hover:shadow-lg relative ${ // Added relative for discount tag
                     selectedService?.id === service.id
                       ? 'ring-2 ring-salon-primary bg-salon-light'
                       : 'hover:shadow-md'
                   }`}
                   onClick={() => handleServiceSelect(service)}
                 >
+                  {/* Discount Tag - Only show if discount is a number and greater than 0 */}
+                  {typeof service.discount === 'number' && service.discount > 0 && (
+                    <div className="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg z-10 flex items-center shadow-md">
+                      <Tag className="h-4 w-4 mr-1" /> {/* Using Tag icon */}
+                      {`${service.discount}% OFF`}
+                    </div>
+                  )}
+
                   <div className="aspect-w-16 aspect-h-12 overflow-hidden rounded-t-lg">
                     <img
                       src={service.image || 'https://placehold.co/400x300/E0E7FF/4338CA?text=Service%20Image'}
@@ -152,9 +163,34 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                       <h3 className="font-semibold text-lg text-salon-dark">
                         {service.name}
                       </h3>
-                      {/* <span className="text-xl font-bold text-salon-primary">
-                        P{service.price.toFixed(2)}
-                      </span> */}
+                      {/* Price Display Logic */}
+                      <div className="flex flex-col items-end"> {/* Align prices to the right */}
+                        {typeof service.discount === 'number' && service.discount > 0 ? (
+                          <>
+                            {/* Original Price (Strikethrough) for discounted items */}
+                            <span className="text-sm text-gray-500 line-through">
+                              P{service.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            {/* Total Price (New Price) for discounted items */}
+                            {service.total_price !== undefined && (
+                              <span className="text-xl font-bold text-red-600">
+                                P{service.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                            {/* Fallback if total_price is missing but discount exists (should not happen if DB computes) */}
+                            {service.total_price === undefined && (
+                              <span className="text-xl font-bold text-red-600">
+                                P{(service.price * (1 - (service.discount / 100))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          // If no discount or discount is 0, display only total_price (or original price if total_price is absent)
+                          <span className="text-xl font-bold text-salon-primary">
+                            P{(service.total_price !== undefined ? service.total_price : service.price)?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                       {service.description}

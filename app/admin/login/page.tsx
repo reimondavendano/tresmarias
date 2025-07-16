@@ -4,18 +4,21 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Scissors, Sparkles } from 'lucide-react';
+import { ArrowLeft, Scissors, Sparkles } from 'lucide-react';
 import { loginAdmin, setAdminAuthenticated } from '@/store/slices/adminSlice';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store/store';
 import jwt from 'jsonwebtoken';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useDispatch<AppDispatch>();
+  
   useEffect(() => {
     // Redirect to dashboard if already authenticated
     const isAuthenticated = localStorage.getItem('adminToken') || sessionStorage.getItem('adminSession');
@@ -24,8 +27,7 @@ const dispatch = useDispatch<AppDispatch>();
     }
   }, [router]);
 
-  // Handle login submission  
-
+  // Handle login submission 
   const handleLogin = async (credentials: { username: string; password: string }) => {
     setIsLoading(true);
     setError('');
@@ -36,12 +38,12 @@ const dispatch = useDispatch<AppDispatch>();
         body: JSON.stringify(credentials),
       });
       const result = await res.json();
-        if (!res.ok || !result.success) {
-          setError(result.error || result.message || 'Invalid username or password');
-        } else {
-          dispatch(setAdminAuthenticated(true)); // <-- set Redux state
-          router.push('/admin/dashboard');       // <-- redirect
-        }
+      if (!res.ok || !result.success) {
+        setError(result.error || result.message || 'Invalid username or password');
+      } else {
+        dispatch(setAdminAuthenticated(true)); // <-- set Redux state
+        router.push('/admin/dashboard');       // <-- redirect
+      }
     } catch (e) {
       setError('An error occurred during login');
     }
@@ -62,9 +64,12 @@ const dispatch = useDispatch<AppDispatch>();
         <div className="absolute inset-0 bg-black/40"></div>
         <div className="absolute inset-0 bg-salon-gradient opacity-40"></div>
       </div>
-
-      <div className="w-full max-w-md">
+      
+      <div className="w-full max-w-md relative z-10">
         <Card className="border-purple-200 shadow-2xl bg-white/95 backdrop-blur-sm">
+          {/* Reverted: Link to Main Menu - Now inside CardContent, pushed to bottom */}
+          {/* Removed the div that was before CardHeader */}
+
           <CardHeader className="text-center pb-8">
             <div className="flex justify-center mb-6">
               <div className="relative">
@@ -79,8 +84,8 @@ const dispatch = useDispatch<AppDispatch>();
               Sign in to access the Tres Marias admin dashboard
             </CardDescription>
           </CardHeader>
-          <CardContent className="px-8 pb-8">
-             {error && (
+          <CardContent className="px-8 pb-8 flex flex-col justify-between h-full">
+              {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
@@ -89,6 +94,14 @@ const dispatch = useDispatch<AppDispatch>();
               onSubmit={handleLogin}
               isLoading={isLoading}
             />
+            {/* Re-added: Link to Main Menu - Now inside CardContent, pushed to bottom */}
+            <div className="text-center mt-auto pt-6"> {/* Uses mt-auto to push to bottom */}
+              <Link href="/">
+                <Button variant="ghost" className="text-gray-600 hover:text-salon-primary flex items-center justify-center">
+                  <ArrowLeft className="h-4 w-4 mr-2" /> Back to Main Menu
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>

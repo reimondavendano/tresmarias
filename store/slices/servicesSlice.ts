@@ -73,7 +73,7 @@ export const fetchService = createAsyncThunk(
 // Async Thunk for adding a service
 export const addService = createAsyncThunk(
   'services/addService',
-  async (newServiceData: Omit<Service, 'id' | 'created_at' | 'updated_at'>, { rejectWithValue }) => {
+  async (newServiceData: Omit<Service, 'id' | 'created_at' | 'updated_at'>, { rejectWithValue }) => { // Note: 'total_price' omitted if DB computes it
     try {
       const response = await fetch('/api/services', {
         method: 'POST',

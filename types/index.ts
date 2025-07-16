@@ -15,6 +15,8 @@ export interface Service {
   updated_at: string;
   category: 'hair' | 'nails' | 'foot' | 'facial' | string; // 
   image: string;
+  discount?: number | undefined // New: Percentage discount, e.g., 0.15 for 15%
+  total_price?: number; // New: Price after discount
 }
 
 /**
@@ -109,5 +111,16 @@ export interface AdminResponse {
 }
 
 export type AdminUser = AdminResponse;
+
+/**
+ * New: Interface representing a gallery image.
+ */
+export interface GalleryImage {
+  id: string;
+  name: string;
+  description?: string;
+  image_url: string; // Renamed from 'image' to 'image_url' for clarity and consistency with other types
+  created_at: string;
+}
 
 

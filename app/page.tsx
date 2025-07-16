@@ -5,6 +5,9 @@ import { ServicesSection } from '@/components/home/ServicesSection';
 import { TeamSection } from '@/components/home/TeamSection';
 import { AboutSection } from '@/components/home/AboutSection';
 import CreateAdmin from '@/components/admin/CreateAdmin';
+import { GallerySection } from '@/components/home/GallerySection';
+
+
 
 export default function Home() {
   return (
@@ -13,6 +16,7 @@ export default function Home() {
       <HeroSection />
       {/* <CreateAdmin /> */}
       <ServicesSection />
+      <GallerySection/>
       <TeamSection />
       <AboutSection />
       <Footer />

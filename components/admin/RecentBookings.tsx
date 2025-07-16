@@ -35,7 +35,7 @@ export function RecentBookings() {
   };
 
   return (
-    <Card>
+    <Card className="col-span-full p-6 shadow-lg rounded-xl">
       <CardHeader>
         <CardTitle className="text-salon-dark">Recent Bookings</CardTitle>
       </CardHeader>

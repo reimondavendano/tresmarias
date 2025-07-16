@@ -3,8 +3,11 @@ import type { Metadata } from 'next';
 import { Inter, Open_Sans, Playfair_Display } from 'next/font/google';
 import { ReduxProvider } from '@/components/providers/ReduxProvider';
 import { Toaster } from '@/components/ui/sonner';
+import { FloatingMessengerButton } from '@/components/floatingMessengerButton';
 
 const open = Open_Sans({ subsets: ['latin'], variable: '--font-inter' });
+import { config } from '@fortawesome/fontawesome-svg-core';
+
 
 
 export const metadata: Metadata = {
@@ -22,6 +25,7 @@ export default function RootLayout({
       <body className={`${open.variable} font-sans`}>
         <ReduxProvider>
           {children}
+          <FloatingMessengerButton /> {/* Place it here */}
           <Toaster />
         </ReduxProvider>
       </body>

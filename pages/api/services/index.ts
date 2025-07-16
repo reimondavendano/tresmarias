@@ -1,6 +1,4 @@
 // pages/api/services/index.ts
-// This Next.js API Route handles requests to /api/services.
-// It serves as the server-side endpoint for fetching and managing services.
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { fetchAllServices, addService } from '@/utils/supabase/services'; // Import the service functions
@@ -24,8 +22,14 @@ export default async function handler(
   } else if (req.method === 'POST') {
     const serviceData = req.body;
 
-    // Validate required fields
-    const requiredFields = ['name', 'description', 'price', 'duration'];
+    // Validate required fields. Add 'discount' if it's a mandatory input for a new service.
+    // If discount is optional, remove it from here.
+    const requiredFields = ['name', 'description', 'price']; // price is original price
+    // If discount is passed from the frontend and saved, include it.
+    // if (serviceData.discount !== undefined) {
+    //   requiredFields.push('discount');
+    // }
+    
     const missingFields = requiredFields.filter(field => !serviceData[field]);
 
     if (missingFields.length > 0) {

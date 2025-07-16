@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Calendar, DollarSign, Users, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, CheckCircle, XCircle, Award } from 'lucide-react'; // Import Award for completed bookings
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Import Chart.js and react-chartjs-2 components
@@ -30,7 +30,8 @@ import { fetchBookings } from '@/store/slices/bookingSlice';
 import { fetchAllCustomers } from '@/store/slices/customerSlice';
 
 // Import the types from your types/index.ts file
-import { Booking, Customer } from '@/types'; // Assuming your types file is at '@/types/index.ts'
+import { Booking, Customer } from '@/types';
+import { RecentBookings } from './RecentBookings';
 
 export default function App() {
   const dispatch = useAppDispatch();
@@ -108,6 +109,8 @@ export default function App() {
   const currentMonthConfirmedBookings = getBookingsForMonth(dataBookings, currentMonthDate, 'confirmed').length;
   const currentMonthPendingBookings = getBookingsForMonth(dataBookings, currentMonthDate, 'pending').length;
   const currentMonthCancelledBookings = getBookingsForMonth(dataBookings, currentMonthDate, 'cancelled').length;
+  // New: Calculate completed bookings for the current month
+  const currentMonthCompletedBookings = getBookingsForMonth(dataBookings, currentMonthDate, 'completed').length;
   const currentMonthActiveCustomers = getCustomersForMonth(customers, currentMonthDate).length;
 
 
@@ -116,10 +119,12 @@ export default function App() {
   const previousMonthConfirmedBookings = getBookingsForMonth(dataBookings, previousMonthDate, 'confirmed').length;
   const previousMonthPendingBookings = getBookingsForMonth(dataBookings, previousMonthDate, 'pending').length;
   const previousMonthCancelledBookings = getBookingsForMonth(dataBookings, previousMonthDate, 'cancelled').length;
+  // New: Calculate completed bookings for the previous month
+  const previousMonthCompletedBookings = getBookingsForMonth(dataBookings, previousMonthDate, 'completed').length;
   const previousMonthActiveCustomers = getCustomersForMonth(customers, previousMonthDate).length;
 
 
-  // Calculate monthly revenue for chart
+  // Calculate monthly revenue for chart based on 'completed' bookings
   const calculateMonthlyRevenue = () => {
     const revenueByMonth: { [key: string]: number } = {};
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1); // Start 6 months ago
@@ -132,13 +137,13 @@ export default function App() {
     }
 
     dataBookings.forEach((booking: Booking) => { // Use dataBookings here
-      // Ensure booking.service exists, and its price is a valid number
-      if (booking.status === 'confirmed' && booking.service && typeof booking.service.price === 'number' && booking.service.price > 0 && booking.created_at) {
+      // Ensure total_amount exists and is a valid number, and status is 'completed'
+      if (booking.status === 'completed' && typeof booking.total_amount === 'number' && booking.total_amount > 0 && booking.created_at) {
         const bookingDate = new Date(booking.created_at);
         if (!isNaN(bookingDate.getTime())) {
           const monthYear = bookingDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
           if (revenueByMonth.hasOwnProperty(monthYear)) {
-            revenueByMonth[monthYear] += booking.service.price;
+            revenueByMonth[monthYear] += booking.total_amount; // Use total_amount for revenue
           }
         }
       }
@@ -166,6 +171,8 @@ export default function App() {
   const confirmedBookingsChange = getChangeData(currentMonthConfirmedBookings, previousMonthConfirmedBookings);
   const pendingBookingsChange = getChangeData(currentMonthPendingBookings, previousMonthPendingBookings);
   const cancelledBookingsChange = getChangeData(currentMonthCancelledBookings, previousMonthCancelledBookings);
+  // New: Calculate change for completed bookings
+  const completedBookingsChange = getChangeData(currentMonthCompletedBookings, previousMonthCompletedBookings);
   const monthlyRevenueChange = getChangeData(currentMonthRevenue, previousMonthRevenue);
   const activeCustomersChange = getChangeData(currentMonthActiveCustomers, previousMonthActiveCustomers);
 
@@ -199,11 +206,17 @@ export default function App() {
       changeType: cancelledBookingsChange.changeType,
       icon: XCircle,
     },
+    // New: Card for Completed Bookings
     {
-      title: 'Monthly Revenue',
+      title: 'Completed Bookings',
+      value: dataIsLoadingBookings ? 'Loading...' : currentMonthCompletedBookings.toString(),
+      change: completedBookingsChange.change,
+      changeType: completedBookingsChange.changeType,
+      icon: Award, // Using Award icon for completed
+    },
+    {
+      title: 'Total Revenue', // Changed from Monthly Revenue to Total Revenue as it's now based on completed
       value: dataIsLoadingBookings ? 'Loading...' : `P${currentMonthRevenue.toLocaleString()}`,
-      // Note: lucide-react does not have a specific 'PhilippinePeso' icon.
-      // Using DollarSign as a generic currency icon.
       change: monthlyRevenueChange.change,
       changeType: monthlyRevenueChange.changeType,
       icon: DollarSign,
@@ -324,7 +337,7 @@ export default function App() {
       </div>
 
       {/* Monthly Revenue Bar Chart */}
-      <Card className="col-span-full p-6 shadow-lg rounded-xl">
+      <Card className="col-span-full p-6 shadow-lg rounded-xl mb-8">
         <CardHeader className="mb-4">
           <CardTitle className="text-xl font-bold text-gray-800">Monthly Revenue Trend</CardTitle>
         </CardHeader>
@@ -340,6 +353,10 @@ export default function App() {
           )}
         </CardContent>
       </Card>
+
+      {/* Recent Bookings Section */}
+      <RecentBookings />
+    
     </div>
   );
 }

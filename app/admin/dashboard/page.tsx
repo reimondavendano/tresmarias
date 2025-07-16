@@ -34,9 +34,6 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         <DashboardStats />
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-2">
-          <RecentBookings />
-        </div>
       </div>
     </AdminLayout>
   );
