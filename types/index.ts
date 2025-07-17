@@ -126,12 +126,12 @@ export interface GalleryImage {
 /**
  * New: Interface representing a service banner.
  */
+
 export interface ServiceBanner {
   id: string;
-  title: string;
-  description?: string;
-  image_url: string;
-  is_active: boolean;
   created_at: string;
+  title: string;
+  description: string | null;
+  image_url: string | null; // This is crucial for storing the image path
+  is_active: boolean;
 }
-

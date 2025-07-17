@@ -45,7 +45,7 @@ export default function App() {
 
   // Fetch bookings and all customers on component mount
   useEffect(() => {
-    dispatch(fetchBookings(10)); // Fetch a reasonable limit of bookings
+    dispatch(fetchBookings({ pageSize: 500 })); // Fetch a reasonable number of bookings for stats
     dispatch(fetchAllCustomers()); // Fetch all customers
   }, [dispatch]);
 

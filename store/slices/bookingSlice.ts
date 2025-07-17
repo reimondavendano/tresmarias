@@ -3,6 +3,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Booking, BookingData, BookingStatus } from '@/types';
 
+// Define the state interface for the booking slice
 interface BookingState {
   bookings: Booking[];
   currentBooking: Partial<BookingData>;
@@ -10,8 +11,20 @@ interface BookingState {
   error: string | null;
   isCreating: boolean;
   createError: string | null;
+  isUpdatingStatus: boolean;     // New: Loading state for status updates
+  updateStatusError: string | null; // New: Error for status updates
+  isCheckingAvailability: boolean; // New: Loading state for availability check
+  checkAvailabilityError: string | null; // New: Error for availability check
+  isAvailable: boolean | null;   // New: Stores the availability result (true/false/null)
+
+  // New: For pagination and search
+  currentPage: number;
+  pageSize: number;
+  totalBookings: number;
+  totalPages: number;
 }
 
+// Define the initial state with new properties
 const initialState: BookingState = {
   bookings: [],
   currentBooking: {},
@@ -19,20 +32,45 @@ const initialState: BookingState = {
   error: null,
   isCreating: false,
   createError: null,
+  isUpdatingStatus: false,
+  updateStatusError: null,
+  isCheckingAvailability: false,
+  checkAvailabilityError: null,
+  isAvailable: null, // Initial state for availability
+
+  currentPage: 1,
+  pageSize: 10, // Default page size
+  totalBookings: 0,
+  totalPages: 0,
 };
 
-// Async thunk for fetching bookings
+// Async thunk for fetching bookings with pagination, search, and filters
 export const fetchBookings = createAsyncThunk(
   'booking/fetchBookings',
-  async (limit: number = 10, { rejectWithValue }) => {
+  async ({ page, pageSize, searchTerm, statusFilter }: { page?: number; pageSize?: number; searchTerm?: string; statusFilter?: string }, { getState, rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/bookings?limit=${limit}`);
+      const state = getState() as { booking: BookingState }; // Access current state for defaults
+      const currentPage = page ?? state.booking.currentPage;
+      const current_pageSize = pageSize ?? state.booking.pageSize;
+      const current_searchTerm = searchTerm ?? '';
+      const current_statusFilter = statusFilter ?? 'all';
+
+      // Construct URLSearchParams for clean API calls
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: current_pageSize.toString(),
+        searchTerm: current_searchTerm,
+        statusFilter: current_statusFilter,
+      });
+
+      const response = await fetch(`/api/bookings?${params.toString()}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch bookings');
       }
-      const data: Booking[] = await response.json();
-      return data;
+      // API now returns { bookings, totalCount }
+      const data: { bookings: Booking[], totalCount: number } = await response.json();
+      return data; 
     } catch (error: any) {
       console.error('Redux Thunk Error (fetchBookings):', error);
       return rejectWithValue(error.message || 'An unknown error occurred while fetching bookings.');
@@ -67,14 +105,13 @@ export const createBooking = createAsyncThunk(
   }
 );
 
-
 // Async thunk for updating booking status
 export const updateBookingStatus = createAsyncThunk(
   'booking/updateBookingStatus',
   async ({ id, status }: { id: string; status: BookingStatus }, { rejectWithValue }) => {
     try {
       const response = await fetch(`/api/bookings/${id}`, { // Target specific booking by ID
-        method: 'PUT', // Use PUT for updating an existing resource
+        method: 'PUT', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }), // Only send the status to update
       });
@@ -107,7 +144,7 @@ export const checkAvailability = createAsyncThunk(
       }
       
       const data = await response.json();
-      return data.available;
+      return data.available; // API returns { available: boolean }
     } catch (error: any) {
       console.error('Redux Thunk Error (checkAvailability):', error);
       return rejectWithValue(error.message || 'An unknown error occurred while checking availability.');
@@ -125,12 +162,21 @@ const bookingSlice = createSlice({
     clearCurrentBooking: (state) => {
       state.currentBooking = {};
     },
-    addBooking: (state, action: PayloadAction<Booking>) => {
-      state.bookings.unshift(action.payload); // Add to beginning of array
-    },
+    // addBooking might be redundant if fetchBookings is called after creation
+    // addBooking: (state, action: PayloadAction<Booking>) => {
+    //   state.bookings.unshift(action.payload); 
+    // },
     clearError: (state) => {
       state.error = null;
       state.createError = null;
+      state.updateStatusError = null;     // Clear update status error
+      state.checkAvailabilityError = null; // Clear check availability error
+    },
+    setPage: (state, action: PayloadAction<number>) => { // New reducer for pagination
+        state.currentPage = action.payload;
+    },
+    setPageSize: (state, action: PayloadAction<number>) => { // New reducer for page size
+        state.pageSize = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -140,15 +186,19 @@ const bookingSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchBookings.fulfilled, (state, action: PayloadAction<Booking[]>) => {
+      .addCase(fetchBookings.fulfilled, (state, action: PayloadAction<{ bookings: Booking[], totalCount: number }>) => {
         state.isLoading = false;
-        state.bookings = action.payload;
+        state.bookings = action.payload.bookings;
+        state.totalBookings = action.payload.totalCount;
+        state.totalPages = Math.ceil(action.payload.totalCount / state.pageSize); // Calculate total pages
         state.error = null;
       })
       .addCase(fetchBookings.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
         state.bookings = [];
+        state.totalBookings = 0;
+        state.totalPages = 0;
       })
       // --- createBooking ---
       .addCase(createBooking.pending, (state) => {
@@ -157,13 +207,48 @@ const bookingSlice = createSlice({
       })
       .addCase(createBooking.fulfilled, (state, action: PayloadAction<Booking>) => {
         state.isCreating = false;
-        state.bookings.unshift(action.payload); // Add to beginning of array
+        // If you rely on re-fetching bookings after creation, you don't need to unshift here:
+        // state.bookings.unshift(action.payload); 
         state.createError = null;
-        state.currentBooking = {}; // Clear current booking after successful creation
+        state.currentBooking = {};
       })
       .addCase(createBooking.rejected, (state, action) => {
         state.isCreating = false;
         state.createError = action.payload as string;
+      })
+      // --- updateBookingStatus ---
+      .addCase(updateBookingStatus.pending, (state) => {
+        state.isUpdatingStatus = true;
+        state.updateStatusError = null;
+      })
+      .addCase(updateBookingStatus.fulfilled, (state, action: PayloadAction<Booking>) => {
+        state.isUpdatingStatus = false;
+        state.updateStatusError = null;
+        // Find and update the specific booking in the array
+        const index = state.bookings.findIndex(booking => booking.id === action.payload.id);
+        if (index !== -1) {
+          state.bookings[index] = action.payload;
+        }
+      })
+      .addCase(updateBookingStatus.rejected, (state, action) => {
+        state.isUpdatingStatus = false;
+        state.updateStatusError = action.payload as string;
+      })
+      // --- checkAvailability ---
+      .addCase(checkAvailability.pending, (state) => {
+        state.isCheckingAvailability = true;
+        state.checkAvailabilityError = null;
+        state.isAvailable = null; // Reset availability status while loading
+      })
+      .addCase(checkAvailability.fulfilled, (state, action: PayloadAction<boolean>) => {
+        state.isCheckingAvailability = false;
+        state.checkAvailabilityError = null;
+        state.isAvailable = action.payload; // Store the boolean result
+      })
+      .addCase(checkAvailability.rejected, (state, action) => {
+        state.isCheckingAvailability = false;
+        state.checkAvailabilityError = action.payload as string;
+        state.isAvailable = false; // Assume not available on error
       });
   },
 });
@@ -171,8 +256,10 @@ const bookingSlice = createSlice({
 export const { 
   setCurrentBooking, 
   clearCurrentBooking, 
-  addBooking, 
-  clearError 
+  // addBooking, // Consider removing if you always re-fetch after create
+  clearError,
+  setPage, // Export new reducer
+  setPageSize // Export new reducer
 } = bookingSlice.actions;
 
 export default bookingSlice.reducer;

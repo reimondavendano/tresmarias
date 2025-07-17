@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import { fetchRecentBookings } from '@/utils/supabase/booking';
+// Import fetchPaginatedBookings instead of fetchRecentBookings
+import { fetchPaginatedBookings } from '@/utils/supabase/booking';
 
 export default async function handler(
   req: NextApiRequest,
@@ -19,12 +20,14 @@ export default async function handler(
       }
 
       // Verify JWT token
-      jwt.verify(token, process.env.JWT_SECRET!);
+      // Ensure process.env.JWT_SECRET is correctly set in your .env.local file
+      jwt.verify(token, process.env.JWT_SECRET!); 
 
       const limit = parseInt(req.query.limit as string) || 10;
 
-      // Get recent bookings using the supabase service
-      const [bookings, error] = await fetchRecentBookings(limit);
+      // Use fetchPaginatedBookings to get recent (first page) bookings
+      // Pass page = 1, pageSize = limit, an empty searchTerm, and 'all' for statusFilter
+      const [result, error] = await fetchPaginatedBookings(1, limit, '', 'all');
 
       if (error) {
         console.error('API Route Error: GET /api/dashboard/bookings -', error.message);
@@ -33,6 +36,10 @@ export default async function handler(
           error: error.message
         });
       }
+
+      // fetchPaginatedBookings returns an object { bookings: [], totalCount: 0 }
+      // Extract the 'bookings' array to send as data
+      const bookings = result?.bookings || [];
 
       return res.status(200).json({
         success: true,

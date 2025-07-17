@@ -12,7 +12,8 @@ import {
   Sparkles,
   PhilippinePeso,
   Scissors,
-  PersonStanding
+  PersonStanding,
+  Flag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -25,7 +26,7 @@ const navigation = [
   { name: 'Services', href: '/admin/services', icon: Scissors },
   { name: 'Stylist', href: '/admin/stylists', icon: PersonStanding },
   { name: 'Customers', href: '/admin/customers', icon: Users },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: 'Service Banner', href: '/admin/service_banner', icon: Flag },
 ];
 
 interface AdminLayoutProps {

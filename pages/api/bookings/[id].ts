@@ -1,15 +1,14 @@
 // pages/api/bookings/[id].ts
-// This Next.js API Route handles requests to /api/bookings/{id} for fetching, updating, and deleting a specific booking.
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { fetchBookingById, updateBooking } from '@/utils/supabase/booking'; // Import booking service functions
-import { BookingStatus } from '@/types'; // Import BookingStatus type
+import { fetchBookingById, updateBooking } from '@/utils/supabase/booking';
+import { BookingStatus, Booking } from '@/types'; // Import Booking type as well
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const { id } = req.query; // Get the booking ID from the dynamic route parameter
+  const { id } = req.query;
 
   if (!id || typeof id !== 'string') {
     return res.status(400).json({ message: 'Booking ID is required and must be a string.' });
@@ -38,7 +37,14 @@ export default async function handler(
       return res.status(400).json({ message: 'Invalid status provided.' });
     }
 
-    const [updatedBooking, error] = await updateBooking(id, { status });
+    // Explicitly define the type of the update object to match updateBooking's expectation.
+    // This clarifies to TypeScript that 'status' is a valid property for this update,
+    // assuming 'Booking' type (from '@/types') includes a 'status' field.
+    const updates: Partial<Omit<Booking, 'id' | 'created_at'>> = {
+      status: status as BookingStatus, // Cast to BookingStatus for stronger type safety
+    };
+
+    const [updatedBooking, error] = await updateBooking(id, updates);
 
     if (error) {
       console.error(`API Route Error: PUT /api/bookings/${id} -`, error.message);
@@ -51,14 +57,9 @@ export default async function handler(
 
     return res.status(200).json(updatedBooking);
 
-  // Handle DELETE requests (if you want to allow deleting bookings)
-  // } else if (req.method === 'DELETE') {
-  //   // Implement deleteBooking in utils/supabase/booking.ts and call it here
-  //   // const [success, error] = await deleteBooking(id);
-  //   // if (error) { ... }
-  //   // return res.status(200).json({ message: 'Booking deleted successfully' });
+  // Handle other HTTP methods not allowed
   } else {
-    res.setHeader('Allow', ['GET', 'PUT']); // Allow only GET and PUT for now
+    res.setHeader('Allow', ['GET', 'PUT']); // Allow GET and PUT methods for this endpoint
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

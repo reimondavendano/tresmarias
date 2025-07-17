@@ -5,7 +5,6 @@ import { ReduxProvider } from '@/components/providers/ReduxProvider';
 import { Toaster } from '@/components/ui/sonner';
 
 const open = Open_Sans({ subsets: ['latin'], variable: '--font-inter' });
-import { config } from '@fortawesome/fontawesome-svg-core';
 
 
 

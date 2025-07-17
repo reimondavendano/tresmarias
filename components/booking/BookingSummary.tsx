@@ -222,7 +222,7 @@ export function BookingSummary({ onComplete, onPrevious, isCreating }: BookingSu
             <Separator />
             <div className="flex justify-between items-center text-lg font-bold">
               <span className="text-salon-dark">Total</span>
-              <span className="text-salon-primary">${currentBooking.total_amount?.toFixed(2) || '0.00'}</span>
+              <span className="text-salon-primary">P{currentBooking.total_amount?.toFixed(2) || '0.00'}</span>
             </div>
           </CardContent>
         </Card>
@@ -235,9 +235,7 @@ export function BookingSummary({ onComplete, onPrevious, isCreating }: BookingSu
               <h3 className="font-semibold text-salon-dark mb-2">Payment & Cancellation Policy</h3>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>• Payment is due at the time of service</li>
-                <li>• We accept cash, credit cards, and digital payments</li>
                 <li>• Free cancellation up to 24 hours before your appointment</li>
-                <li>• Late cancellations may incur a 50% service fee</li>
               </ul>
             </div>
           </div>

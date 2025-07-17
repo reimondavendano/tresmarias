@@ -1,13 +1,13 @@
 // utils/supabase/stylists.ts
 
-import { supabaseService } from '@/utils/supabase/client/supaBaseClient';
+import { supabaseAdmin } from '@/utils/supabase/client/supabaseAdmin';
 import { Stylist } from '@/types';
 
 /**
  * Fetches all stylists from the 'stylists' table.
  */
 export const fetchAllStylists = async (): Promise<[Stylist[] | null, any | null]> => {
-  const { data, error } = await supabaseService // <-- Use supabaseService
+  const { data, error } = await supabaseAdmin // <-- Use supabaseAdmin
     .from('tbl_stylists')
     .select('*')
     .order('rating', { ascending: false });
@@ -23,7 +23,7 @@ export const fetchAllStylists = async (): Promise<[Stylist[] | null, any | null]
  * Fetches a single stylist from the 'tbl_stylists' table by their ID.
  */
 export const fetchStylistById = async (id: string): Promise<[Stylist | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_stylists') // Assuming your stylist table is named 'tbl_stylists'
     .select('*')
     .eq('id', id)
@@ -45,7 +45,7 @@ export const fetchStylistById = async (id: string): Promise<[Stylist | null, any
  */
 export const fetchAvailableStylists = async (serviceId: string): Promise<[Stylist[] | null, any | null]> => {
   // First get the service to check what specialties are needed
-  const { data: service, error: serviceError } = await supabaseService // <-- Use supabaseService
+  const { data: service, error: serviceError } = await supabaseAdmin // <-- Use supabaseAdmin
     .from('tbl_stylists')
     .select('name')
     .eq('id', serviceId)
@@ -57,7 +57,7 @@ export const fetchAvailableStylists = async (serviceId: string): Promise<[Stylis
   }
 
   // Get all available stylists
-  const { data, error } = await supabaseService // <-- Use supabaseService
+  const { data, error } = await supabaseAdmin // <-- Use supabaseAdmin
     .from('tbl_stylists')
     .select('*')
     .eq('is_available', true)
@@ -84,7 +84,7 @@ export const fetchAvailableStylists = async (serviceId: string): Promise<[Stylis
 
 // Add full CRUD for stylists to match the service functions
 export const addStylist = async (newStylist: Omit<Stylist, 'id' | 'created_at' | 'updated_at'>): Promise<[Stylist | null, any | null]> => {
-  const { data, error } = await supabaseService // <-- Use supabaseService
+  const { data, error } = await supabaseAdmin // <-- Use supabaseAdmin
     .from('tbl_stylists')
     .insert([newStylist])
     .select()
@@ -97,7 +97,7 @@ export const addStylist = async (newStylist: Omit<Stylist, 'id' | 'created_at' |
 };
 
 export const updateStylist = async (id: string, updates: Partial<Stylist>): Promise<[Stylist | null, any | null]> => {
-  const { data, error } = await supabaseService // <-- Use supabaseService
+  const { data, error } = await supabaseAdmin // <-- Use supabaseAdmin
     .from('tbl_stylists')
     .update(updates)
     .eq('id', id)
@@ -111,7 +111,7 @@ export const updateStylist = async (id: string, updates: Partial<Stylist>): Prom
 };
 
 export const deleteStylist = async (id: string): Promise<[boolean, any | null]> => {
-  const { error } = await supabaseService // <-- Use supabaseService
+  const { error } = await supabaseAdmin // <-- Use supabaseAdmin
     .from('tbl_stylists')
     .delete()
     .eq('id', id);

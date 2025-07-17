@@ -188,7 +188,7 @@ export function ServiceSelection({ onNext }: ServiceSelectionProps) {
                   {typeof service.discount === 'number' && service.discount > 0 && (
                     <div className="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg z-10 flex items-center shadow-md">
                       <Tag className="h-4 w-4 mr-1" /> {/* Using Tag icon */}
-                      {`${service.discount}% OFF`}
+                      {`P${service.discount} OFF`}
                     </div>
                   )}
 

@@ -397,7 +397,7 @@ export default function ServiceManagement() {
                   {typeof service.discount === 'number' && service.discount > 0 && (
                     <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-md z-10 flex items-center shadow-md"> {/* Adjusted position and styling */}
                       <Tag className="h-3 w-3 mr-1" /> {/* Smaller Tag icon */}
-                      {`${service.discount}% OFF`}
+                      {`P${service.discount} OFF`}
                     </div>
                   )}
 

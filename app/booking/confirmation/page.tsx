@@ -102,8 +102,8 @@ export default function BookingConfirmationPage() {
           </Link>
           <p className="text-sm text-gray-600">
             Need to reschedule or cancel? Call us at{' '}
-            <a href="tel:+15551234567" className="text-salon-primary hover:underline">
-              +1 (555) 123-4567
+            <a href="#" className="text-salon-primary hover:underline">
+              0975-062-2263
             </a>
           </p>
         </div>

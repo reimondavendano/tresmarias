@@ -1,13 +1,13 @@
 // utils/supabase/gallery.ts
 
-import { supabaseService } from './client/supaBaseClient'; // Assuming your Supabase client setup
+import { supabaseAdmin } from './client/supabaseAdmin'; // Assuming your Supabase client setup
 import { GalleryImage } from '@/types'; // Import the new GalleryImage type
 
 /**
  * Fetches all gallery images from the 'tbl_gallery' table.
  */
 export const fetchAllGalleryImages = async (): Promise<[GalleryImage[] | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_gallery')
     .select('*')
     .order('created_at', { ascending: false }); // Order by creation date, newest first
@@ -23,7 +23,7 @@ export const fetchAllGalleryImages = async (): Promise<[GalleryImage[] | null, a
  * Fetches a single gallery image by its ID.
  */
 export const fetchGalleryImageById = async (id: string): Promise<[GalleryImage | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_gallery')
     .select('*')
     .eq('id', id)

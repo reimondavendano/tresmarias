@@ -1,6 +1,6 @@
 // utils/supabase/admin.ts
 
-import { supabaseService } from '@/utils/supabase/client/supaBaseClient';
+import { supabaseAdmin } from '@/utils/supabase/client/supabaseAdmin';
 import bcrypt from 'bcryptjs';
 import { Admin, AdminCredentials, AdminResponse } from '@/types';
 
@@ -13,7 +13,7 @@ export const authenticateAdmin = async (
   try {
     const { username, password } = credentials;
 
-    const { data: admin, error } = await supabaseService // <-- Use supabaseService
+    const { data: admin, error } = await supabaseAdmin // <-- Use supabaseAdmin
       .from('tbl_admin_users')
       .select('*')
       .eq('username', username)
@@ -65,7 +65,7 @@ export const createAdmin = async (adminData: {
     const saltRounds = 12;
     const password_hash = await bcrypt.hash(password, saltRounds);
 
-    const { data: admin, error } = await supabaseService // <-- Use supabaseService
+    const { data: admin, error } = await supabaseAdmin // <-- Use supabaseAdmin
       .from('tbl_admin_users')
       .insert([{
         username,
@@ -93,7 +93,7 @@ export const createAdmin = async (adminData: {
  */
 export const fetchAdminById = async (id: string): Promise<[AdminResponse | null, any | null]> => {
   try {
-    const { data: admin, error } = await supabaseService // <-- Use supabaseService
+    const { data: admin, error } = await supabaseAdmin // <-- Use supabaseAdmin
       .from('tbl_admin_users')
       .select('id, username, email, is_active')
       .eq('id', id)
@@ -123,7 +123,7 @@ export const updateAdminPassword = async (
     const saltRounds = 12;
     const password_hash = await bcrypt.hash(newPassword, saltRounds);
 
-    const { error } = await supabaseService // <-- Use supabaseService
+    const { error } = await supabaseAdmin // <-- Use supabaseAdmin
       .from('tbl_admin_users')
       .update({ password_hash })
       .eq('id', id);

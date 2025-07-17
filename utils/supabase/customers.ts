@@ -1,13 +1,13 @@
 // utils/supabase/customers.ts
 
-import { supabaseService } from './client/supaBaseClient'; // Assuming you have a configured Supabase client
+import { supabaseAdmin } from './client/supabaseAdmin'; // Assuming you have a configured Supabase client
 import { Customer } from '../../types'; // Corrected import path for Customer type
 
 /**
  * Fetches a customer by their email address.
  */
 export const fetchCustomerByEmail = async (email: string): Promise<[Customer[] | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_customers') // Assuming your customer table is named 'tbl_customers'
     .select('*')
     .eq('email', email);
@@ -23,7 +23,7 @@ export const fetchCustomerByEmail = async (email: string): Promise<[Customer[] |
  * Fetches a customer by their ID.
  */
 export const fetchCustomerById = async (id: string): Promise<[Customer | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_customers') // Assuming your customer table is named 'tbl_customers'
     .select('*')
     .eq('id', id)
@@ -44,7 +44,7 @@ export const fetchCustomerById = async (id: string): Promise<[Customer | null, a
  * Fetches all customers from the 'tbl_customers' table.
  */
 export const fetchAllCustomers = async (): Promise<[Customer[] | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_customers')
     .select('*')
     .order('created_at', { ascending: false }); // Order by creation date for consistency
@@ -60,7 +60,7 @@ export const fetchAllCustomers = async (): Promise<[Customer[] | null, any | nul
  * Creates a new customer entry in the 'tbl_customers' table.
  */
 export const createCustomer = async (newCustomer: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<[Customer | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_customers') // Assuming your customer table is named 'tbl_customers'
     .insert([newCustomer])
     .select()
@@ -77,7 +77,7 @@ export const createCustomer = async (newCustomer: Omit<Customer, 'id' | 'created
  * Updates an existing customer in the 'tbl_customers' table.
  */
 export const updateCustomer = async (id: string, updates: Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>): Promise<[Customer | null, any | null]> => {
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('tbl_customers') // Assuming your customer table is named 'tbl_customers'
     .update(updates)
     .eq('id', id)
@@ -95,7 +95,7 @@ export const updateCustomer = async (id: string, updates: Partial<Omit<Customer,
  * Deletes a customer from the 'tbl_customers' table.
  */
 export const deleteCustomer = async (id: string): Promise<[boolean, any | null]> => {
-  const { error } = await supabaseService
+  const { error } = await supabaseAdmin
     .from('tbl_customers') // Assuming your customer table is named 'tbl_customers'
     .delete()
     .eq('id', id);
