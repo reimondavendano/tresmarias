@@ -5,7 +5,6 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL; // Still uses public URL for connection
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // This is the sensitive key
 
-console.log('Supabase URL:', supabaseServiceRoleKey);
 if (!supabaseUrl) {
   throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL');
 }
@@ -20,6 +19,7 @@ export const supabaseAdmin = createClient(
   supabaseServiceRoleKey,
   {
     auth: {
+      autoRefreshToken: false, // Not needed for admin client
       persistSession: false,   // Not needed for admin client
     },
   }

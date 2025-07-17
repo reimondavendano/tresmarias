@@ -63,6 +63,7 @@ export default function AdminBookingsPage() {
 
   const handleStatusUpdate = async (bookingId: string, newStatus: 'confirmed' | 'cancelled' | 'completed') => {
     setUpdatingBookingIds(prev => new Set(prev).add(bookingId));
+    console.log("Attempting to update booking with ID:", bookingId);
     const resultAction = await dispatch(updateBookingStatus({ id: bookingId, status: newStatus }));
     setUpdatingBookingIds(prev => {
       const newSet = new Set(prev);
@@ -187,7 +188,7 @@ export default function AdminBookingsPage() {
                 />
               </div>
               <Button onClick={handleSearch} className="bg-salon-primary hover:bg-salon-primary/90">
-                Apply Search
+                 Search
               </Button>
             </div>
 

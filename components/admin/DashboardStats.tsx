@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Calendar, DollarSign, Users, Clock, CheckCircle, XCircle, Award } from 'lucide-react'; // Import Award for completed bookings
+import { Calendar, DollarSign, Users, Clock, CheckCircle, XCircle, Award, PhilippinePeso } from 'lucide-react'; // Import Award for completed bookings
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Import Chart.js and react-chartjs-2 components
@@ -215,11 +215,11 @@ export default function App() {
       icon: Award, // Using Award icon for completed
     },
     {
-      title: 'Total Revenue', // Changed from Monthly Revenue to Total Revenue as it's now based on completed
+      title: 'Total Revenue', 
       value: dataIsLoadingBookings ? 'Loading...' : `P${currentMonthRevenue.toLocaleString()}`,
       change: monthlyRevenueChange.change,
       changeType: monthlyRevenueChange.changeType,
-      icon: DollarSign,
+      icon: PhilippinePeso,
     },
     {
       title: 'Active Customers',
