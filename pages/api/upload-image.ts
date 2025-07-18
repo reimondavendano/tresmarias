@@ -1,14 +1,17 @@
-// --- Backend: pages/api/upload-image.ts ---
-// This Next.js API route handles receiving image files via POST requests,
-// saving them to the 'public/assets/img' directory, and returning their public URL.
-
 import type { NextApiRequest, NextApiResponse } from 'next';
-import formidable from 'formidable'; // You'll need to install this library: npm install formidable
+import formidable from 'formidable';
 import path from 'path';
-import fs from 'fs/promises'; // Use fs/promises for async file operations
+import fs from 'fs/promises';
+import { google } from 'googleapis';
 
-// Important: Disable Next.js's default body parser for file uploads
-// Formidable will handle the body parsing.
+// IMPORTANT: Load your service account credentials and folder ID from environment variables
+const googleDriveCreds = JSON.parse(process.env.GOOGLE_DRIVE_CREDS || '{}');
+const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID as string;
+
+// Determine if we are in development mode
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+
+// Disable Next.js's default body parser for file uploads
 export const config = {
   api: {
     bodyParser: false,
@@ -19,56 +22,131 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Ensure only POST requests are allowed
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // Initialize formidable to parse the incoming form data
-  const form = formidable({
-    // Define the directory where uploaded files will be temporarily stored and then moved.
-    // This path resolves to your project's `public/assets/img` directory.
-    uploadDir: path.join(process.cwd(), 'public', 'assets', 'img'),
-    keepExtensions: true, // Keep the original file extension (e.g., .jpg, .png)
-    maxFileSize: 5 * 1024 * 1024, // Set a file size limit (e.g., 5MB). Adjust as needed.
-    
-    // Custom filename generation to ensure unique names and prevent overwrites.
-    // It combines the original filename (if available) with a timestamp and random number.
-    filename: (name, ext, part) => {
-      // Use path.parse to safely get the base name and extension
-      const parsedPath = path.parse(part.originalFilename || 'upload');
-      const baseName = parsedPath.name || 'upload'; // Get the name without extension
-      const fileExtension = parsedPath.ext || ext; // Get the extension, fallback to 'ext' provided by formidable
+  // --- Initialize Google Drive API client (only if not in local public save mode) ---
+  let drive: any;
+  if (!IS_DEVELOPMENT || process.env.ALWAYS_UPLOAD_TO_GDRIVE === 'true') { // Added an override for local testing
+    try {
+      if (!googleDriveCreds.client_email || !googleDriveCreds.private_key) {
+        throw new Error("Google Drive credentials are not properly set.");
+      }
+      const auth = new google.auth.JWT({
+        email: googleDriveCreds.client_email,
+        key: googleDriveCreds.private_key,
+        scopes: ['https://www.googleapis.com/auth/drive.file'],
+      });
 
+      await auth.authorize();
+      drive = google.drive({ version: 'v3', auth });
+
+    } catch (authError: any) {
+      console.error('Google Drive authentication error:', authError);
+      return res.status(500).json({ message: 'Failed to authenticate with Google Drive.', error: authError.message });
+    }
+  }
+
+
+  // --- Configure formidable based on environment ---
+  let uploadDirectory: string;
+  let publicAssetsPath: string | null = null; // To store the public path if saving locally
+
+  if (IS_DEVELOPMENT && process.env.ALWAYS_UPLOAD_TO_GDRIVE !== 'true') {
+    // In development AND not forcing GDrive upload, save to public/assets/img
+    uploadDirectory = path.join(process.cwd(), 'public', 'assets', 'img');
+    // Ensure the directory exists
+    await fs.mkdir(uploadDirectory, { recursive: true }).catch(console.error);
+  } else {
+    // In production or when forcing GDrive upload, use the temporary directory
+    uploadDirectory = path.join(process.cwd(), 'tmp');
+    // Ensure the temporary directory exists
+    await fs.mkdir(uploadDirectory, { recursive: true }).catch(console.error);
+  }
+
+
+  const form = formidable({
+    uploadDir: uploadDirectory,
+    keepExtensions: true,
+    maxFileSize: 5 * 1024 * 1024, // 5MB limit
+    filename: (name, ext, part) => {
+      const parsedPath = path.parse(part.originalFilename || 'upload');
+      const baseName = parsedPath.name || 'upload';
+      const fileExtension = parsedPath.ext || ext;
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      return `${baseName}-${uniqueSuffix}${fileExtension}`;
+      // Construct a unique filename
+      return `${baseName.replace(/\s+/g, '_')}_${uniqueSuffix}${fileExtension}`;
     },
   });
 
-  try {
-    // Parse the incoming request to extract fields and files
-    const [fields, files] = await form.parse(req);
+  let uploadedFilePath: string | null = null; // Formidable's path to the saved file
 
-    // Access the uploaded file. 'image' should match the 'name' attribute
-    // of the file input field in your frontend form (e.g., <Input type="file" name="image" />).
-    const uploadedFile = files.image?.[0]; 
+  try {
+    const [fields, files] = await form.parse(req);
+    const uploadedFile = files.image?.[0];
 
     if (!uploadedFile) {
       return res.status(400).json({ message: 'No image file uploaded.' });
     }
 
-    // The file has already been saved by formidable to the `uploadDir`.
-    // Now, construct the public URL path for the saved image.
-    // `path.basename(uploadedFile.filepath)` extracts just the filename from the full path.
-    const publicPath = `/assets/img/${path.basename(uploadedFile.filepath)}`;
+    uploadedFilePath = uploadedFile.filepath; // This is the path to the saved file (either tmp or public)
 
-    // Send a success response with the public URL of the uploaded image
-    return res.status(200).json({ imageUrl: publicPath, message: 'Image uploaded successfully.' });
+    let finalImageUrl: string;
+    let googleDriveFileId: string | undefined;
+
+    if (IS_DEVELOPMENT && process.env.ALWAYS_UPLOAD_TO_GDRIVE !== 'true') {
+      // If saving locally in development
+      finalImageUrl = `/assets/img/${path.basename(uploadedFile.filepath)}`;
+      console.log(`Image saved locally: ${finalImageUrl}`);
+      // No cleanup needed here as it's meant to stay in public
+    } else {
+      // Production or forced GDrive upload: read from tmp and upload to Google Drive
+      const filename = uploadedFile.originalFilename || path.basename(uploadedFile.filepath);
+      const mimeType = uploadedFile.mimetype || 'application/octet-stream';
+
+      // Read the content of the temporary file
+      const fileContent = await fs.readFile(uploadedFilePath);
+
+      // --- Upload to Google Drive ---
+      const response = await drive.files.create({
+        requestBody: {
+          name: filename,
+          parents: [GOOGLE_DRIVE_FOLDER_ID],
+          mimeType: mimeType,
+        },
+        media: {
+          mimeType: mimeType,
+          body: Buffer.from(fileContent),
+        },
+        fields: 'id,webContentLink,webViewLink',
+      });
+
+      // Important: Clean up the temporary file
+      if (uploadedFilePath) {
+          await fs.unlink(uploadedFilePath);
+      }
+
+      googleDriveFileId = response.data.id;
+      finalImageUrl = response.data.webViewLink; // The Google Drive view link
+      console.log(`Image uploaded to Google Drive. URL: ${finalImageUrl}`);
+    }
+
+    // Return the appropriate URL to the frontend
+    return res.status(200).json({
+      imageUrl: finalImageUrl,
+      googleDriveFileId: googleDriveFileId, // Will be undefined if saved locally
+      message: 'Image uploaded successfully.',
+    });
 
   } catch (error: any) {
-    // Handle any errors that occur during the file upload process
     console.error('File upload error:', error);
-    return res.status(500).json({ message: 'Failed to upload image.', error: error.message });
+    // Clean up temporary file only if it was indeed a temporary file
+    if (uploadedFilePath && (!IS_DEVELOPMENT || process.env.ALWAYS_UPLOAD_TO_GDRIVE === 'true')) {
+        await fs.unlink(uploadedFilePath).catch(e => console.error("Error cleaning up temp file:", e));
+    }
+    const errorMessage = error.message || 'Failed to upload image due to an internal server error.';
+    return res.status(500).json({ message: 'Failed to upload image.', error: errorMessage });
   }
 }

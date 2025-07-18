@@ -12,8 +12,7 @@ import { Service } from '@/types'; // Import your Service type
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label }
- from '@/components/ui/label';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -29,11 +28,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { XCircle, PlusCircle, Edit, Trash2, UploadCloud, Loader2, Tag } from 'lucide-react'; // Added Tag import
+import { XCircle, PlusCircle, Edit, Trash2, UploadCloud, Loader2, Tag } from 'lucide-react';
 
-// Import AdminLayout component
-import { AdminLayout } from '@/components/admin/AdminLayout'; // Assuming this path for your AdminLayout
+// Import AdminLayout component (ensure this path is correct)
+import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardTitle } from '../ui/card'; // Ensure correct path for Card components
+
+// Optional: For toast notifications (install if you want to use)
+// import { useToast } from "@/components/ui/use-toast";
 
 // Define categories for the select input
 const serviceCategories = ['hair', 'nails', 'foot', 'facial', 'other'];
@@ -42,7 +44,7 @@ export default function ServiceManagement() {
   const dispatch = useAppDispatch();
   const services = useAppSelector((state) => state.services.services);
   const isLoading = useAppSelector((state) => state.services.isLoadingServices);
-  const error = useAppSelector((state) => state.services.errorServices);
+  const error = useAppSelector((state) => state.services.errorServices); // General fetch error
   const isAdding = useAppSelector((state) => state.services.isAddingService);
   const addError = useAppSelector((state) => state.services.addServiceError);
   const isUpdating = useAppSelector((state) => state.services.isUpdatingService);
@@ -50,16 +52,18 @@ export default function ServiceManagement() {
   const isDeleting = useAppSelector((state) => state.services.isDeletingService);
   const deleteError = useAppSelector((state) => state.services.deleteServiceError);
 
+  // const { toast } = useToast(); // Uncomment if using shadcn/ui toasts
+
   // Form state for adding/editing services
   const [formData, setFormData] = useState<Partial<Service>>({
     name: '',
     description: '',
     price: 0,
-    duration: 0, // Keep duration in state as it's part of Service type
+    duration: 0,
     category: 'hair',
-    image: '', // This will store the URL after upload
+    image: '',
     is_active: true,
-    discount: 0, // New: Initialize discount
+    discount: 0,
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -69,6 +73,7 @@ export default function ServiceManagement() {
   const [showAddEditDialog, setShowAddEditDialog] = useState(false);
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [formSubmissionError, setFormSubmissionError] = useState<string | null>(null); // For general form submission errors
 
   useEffect(() => {
     dispatch(fetchServices());
@@ -77,9 +82,9 @@ export default function ServiceManagement() {
   // Handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ 
-      ...prev, 
-      [name]: (name === 'price' || name === 'discount') ? Number(value) : value 
+    setFormData((prev) => ({
+      ...prev,
+      [name]: (name === 'price' || name === 'discount' || name === 'duration') ? Number(value) : value,
     }));
   };
 
@@ -98,34 +103,49 @@ export default function ServiceManagement() {
   };
 
   /**
-   * Handles uploading an image to the local 'public/assets/img' directory
-   * via a Next.js API route.
+   * Handles uploading an image to Google Drive via the Next.js API route.
    * @param file The File object to upload.
    * @returns The public URL path of the uploaded image or null if an error occurs.
    */
-  const uploadImageToLocalAssets = async (file: File): Promise<string | null> => {
+  const uploadImageToGoogleDrive = async (file: File): Promise<string | null> => {
     setImageUploadLoading(true);
-    setImageUploadError(null);
+    setImageUploadError(null); // Clear previous image upload errors
+    setFormSubmissionError(null); // Clear any general form submission errors
+
     try {
       const formData = new FormData();
       formData.append('image', file); // 'image' is the field name expected by the backend API
 
-      const response = await fetch('/api/upload-image', { // Call your new API route
+      const response = await fetch('/api/upload-image', { // Call your API route
         method: 'POST',
         body: formData, // FormData automatically sets Content-Type: multipart/form-data
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload image to local assets.');
+        let errorData: { message?: string, error?: string } = {};
+        try {
+          errorData = await response.json(); // Try to parse JSON error from backend
+        } catch (jsonError) {
+          // If backend didn't send JSON, use generic message
+          errorData.message = `Server responded with status ${response.status}.`;
+        }
+        
+        // Log the full backend error response for debugging
+        console.error('Backend image upload error:', errorData);
+
+        // Prioritize specific error message from backend
+        throw new Error(errorData.message || errorData.error || `Failed to upload image: HTTP ${response.status}`);
       }
 
       const result = await response.json();
-      console.log(`Image uploaded to local assets. Path: ${result.imageUrl}`);
-      return result.imageUrl; // The public path returned by your API
+      console.log(`Image uploaded to Google Drive. URL: ${result.imageUrl}`);
+      // toast({ title: "Image Uploaded", description: "Image successfully uploaded to Google Drive.", variant: "success" }); // Uncomment for toasts
+      return result.imageUrl; // The public URL returned by your API
     } catch (err: any) {
       console.error('Image upload failed:', err);
-      setImageUploadError(err.message || 'Failed to upload image locally.');
+      const errorMessage = err.message || 'An unexpected error occurred during image upload.';
+      setImageUploadError(errorMessage);
+      // toast({ title: "Image Upload Failed", description: errorMessage, variant: "destructive" }); // Uncomment for toasts
       return null;
     } finally {
       setImageUploadLoading(false);
@@ -135,56 +155,48 @@ export default function ServiceManagement() {
   // Handle form submission (Add or Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormSubmissionError(null); // Clear previous form submission errors
 
     let imageUrl: string = formData.image || '';
 
     if (selectedFile) {
-      // Use the actual local upload function
-      const uploadedUrl = await uploadImageToLocalAssets(selectedFile);
+      // Use the Google Drive upload function
+      const uploadedUrl = await uploadImageToGoogleDrive(selectedFile);
       if (uploadedUrl === null) {
         // If image upload failed, prevent form submission
+        setFormSubmissionError("Image upload failed. Please fix the image error before submitting.");
         return;
       }
-      imageUrl = uploadedUrl; // imageUrl is now guaranteed to be a string
+      imageUrl = uploadedUrl;
     }
 
-    const serviceDataToSubmit: Omit<Service, 'id' | 'created_at' | 'updated_at' | 'total_price'> = { // Omit total_price
+    const serviceDataToSubmit: Omit<Service, 'id' | 'created_at' | 'updated_at' | 'total_price'> = {
       name: formData.name || '',
       description: formData.description || '',
       price: formData.price || 0,
-      duration: formData.duration || 0, // Keep duration here as it's part of the Service type
+      duration: formData.duration || 0,
       category: formData.category || 'other',
-      image: imageUrl, // Now imageUrl is guaranteed to be a string
-      is_active: formData.is_active ?? true, // Default to true if not set
-      discount: formData.discount || 0, // New: Include discount
+      image: imageUrl,
+      is_active: formData.is_active ?? true,
+      discount: formData.discount || 0,
     };
 
-    if (isEditMode && editingServiceId) {
-      // Update existing service
-      dispatch(updateService({ id: editingServiceId, updates: serviceDataToSubmit }))
-        .unwrap()
-        .then(() => {
-          setShowAddEditDialog(false);
-          resetForm();
-          dispatch(fetchServices()); // Re-fetch to ensure list is updated
-        })
-        .catch((err) => {
-          console.error('Failed to update service:', err);
-          // Error state is handled by Redux slice
-        });
-    } else {
-      // Add new service
-      dispatch(addService(serviceDataToSubmit))
-        .unwrap()
-        .then(() => {
-          setShowAddEditDialog(false);
-          resetForm();
-          dispatch(fetchServices()); // Re-fetch to ensure list is updated
-        })
-        .catch((err) => {
-          console.error('Failed to add service:', err);
-          // Error state is handled by Redux slice
-        });
+    try {
+      if (isEditMode && editingServiceId) {
+        await dispatch(updateService({ id: editingServiceId, updates: serviceDataToSubmit })).unwrap();
+        // toast({ title: "Service Updated", description: "Service details have been updated.", variant: "success" }); // Uncomment for toasts
+      } else {
+        await dispatch(addService(serviceDataToSubmit)).unwrap();
+        // toast({ title: "Service Added", description: "New service has been added successfully.", variant: "success" }); // Uncomment for toasts
+      }
+      setShowAddEditDialog(false);
+      resetForm();
+      dispatch(fetchServices()); // Re-fetch to ensure list is updated
+    } catch (err: any) {
+      console.error('Failed to submit service:', err);
+      setFormSubmissionError(err.message || 'Failed to save service. Please try again.');
+      // Error state for add/update is already handled by Redux slice, but this gives immediate form feedback
+      // toast({ title: "Service Save Failed", description: err.message || "Could not save service.", variant: "destructive" }); // Uncomment for toasts
     }
   };
 
@@ -195,6 +207,8 @@ export default function ServiceManagement() {
     setIsEditMode(true);
     setEditingServiceId(service.id);
     setShowAddEditDialog(true);
+    setImageUploadError(null); // Clear errors when opening edit dialog
+    setFormSubmissionError(null); // Clear errors when opening edit dialog
   };
 
   // Confirm delete action
@@ -204,19 +218,18 @@ export default function ServiceManagement() {
   };
 
   // Execute delete action
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (serviceToDeleteId) {
-      dispatch(deleteService(serviceToDeleteId))
-        .unwrap()
-        .then(() => {
-          setShowDeleteConfirm(false);
-          setServiceToDeleteId(null);
-          // No need to re-fetch, slice handles removal locally
-        })
-        .catch((err) => {
-          console.error('Failed to delete service:', err);
-          // Error state is handled by Redux slice
-        });
+      try {
+        await dispatch(deleteService(serviceToDeleteId)).unwrap();
+        setShowDeleteConfirm(false);
+        setServiceToDeleteId(null);
+        // toast({ title: "Service Deleted", description: "Service has been removed.", variant: "success" }); // Uncomment for toasts
+      } catch (err: any) {
+        console.error('Failed to delete service:', err);
+        // Error state is handled by Redux slice, but you can add a toast here
+        // toast({ title: "Service Deletion Failed", description: err.message || "Could not delete service.", variant: "destructive" }); // Uncomment for toasts
+      }
     }
   };
 
@@ -226,17 +239,18 @@ export default function ServiceManagement() {
       name: '',
       description: '',
       price: 0,
-      duration: 0, // Reset duration to default
+      duration: 0,
       category: 'hair',
       image: '',
       is_active: true,
-      discount: 0, // New: Reset discount
+      discount: 0,
     });
     setSelectedFile(null);
     setIsEditMode(false);
     setEditingServiceId(null);
     setImageUploadError(null);
     setImageUploadLoading(false);
+    setFormSubmissionError(null);
   };
 
   // Function to allow only numbers and specific control keys
@@ -247,7 +261,7 @@ export default function ServiceManagement() {
       (charCode > 31 && (charCode < 48 || charCode > 57)) && // Not a number
       charCode !== 8 && // Backspace
       charCode !== 46 && // Delete
-      charCode !== 9 &&  // Tab
+      charCode !== 9 &&  // Tab
       !(charCode >= 37 && charCode <= 40) // Arrow keys
     ) {
       event.preventDefault();
@@ -255,6 +269,7 @@ export default function ServiceManagement() {
   };
 
   return (
+    
       <div className="p-6 bg-gray-50 min-h-screen font-sans">
         <h1 className="text-3xl font-bold text-salon-primary mb-8">Service Management</h1>
 
@@ -285,31 +300,31 @@ export default function ServiceManagement() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="price" className="text-right">Price</Label>
-                <Input 
-                  id="price" 
-                  name="price" 
-                  type="text" // Changed to text
-                  value={formData.price || 0} 
-                  onChange={handleChange} 
-                  onKeyPress={handleKeyPress} // Added onKeyPress
-                  className="col-span-3" 
-                  required 
+                <Input
+                  id="price"
+                  name="price"
+                  type="text" // Changed to text for handleKeyPress
+                  value={formData.price || 0}
+                  onChange={handleChange}
+                  onKeyPress={handleKeyPress}
+                  className="col-span-3"
+                  required
                 />
               </div>
 
               {/* New: Discount Input */}
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="discount" className="text-right">Discount (%)</Label>
-                <Input 
-                  id="discount" 
-                  name="discount" 
-                  type="text" // Changed to text
-                  value={formData.discount || 0} 
-                  onChange={handleChange} 
-                  onKeyPress={handleKeyPress} // Added onKeyPress
-                  className="col-span-3" 
-                  min="0" 
-                  max="100" 
+                <Input
+                  id="discount"
+                  name="discount"
+                  type="text" // Changed to text for handleKeyPress
+                  value={formData.discount || 0}
+                  onChange={handleChange}
+                  onKeyPress={handleKeyPress}
+                  className="col-span-3"
+                  min="0"
+                  max="100"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -341,14 +356,16 @@ export default function ServiceManagement() {
                   {imageUploadError && <p className="text-red-500 text-sm mt-1">{imageUploadError}</p>}
                 </div>
               </div>
-              {/* Display Redux errors for add/update */}
-              {(addError || updateError) && (
-                <p className="text-red-500 text-sm text-center mt-2">{addError || updateError}</p>
+              {/* Display Redux errors for add/update AND general form submission error */}
+              {(addError || updateError || formSubmissionError) && (
+                <p className="text-red-500 text-sm text-center mt-2">
+                  {addError || updateError || formSubmissionError}
+                </p>
               )}
               <DialogFooter className="mt-4">
                 <Button type="button" variant="outline" onClick={() => setShowAddEditDialog(false)} className="mr-2">Cancel</Button>
                 <Button type="submit" disabled={isAdding || isUpdating || imageUploadLoading} className="bg-green-600 hover:bg-green-700 text-white">
-                  {(isAdding || isUpdating) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {(isAdding || isUpdating || imageUploadLoading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {isEditMode ? 'Save Changes' : 'Add Service'}
                 </Button>
               </DialogFooter>
@@ -395,8 +412,8 @@ export default function ServiceManagement() {
                 <div className="relative w-full h-48 bg-gray-200 overflow-hidden flex items-center justify-center">
                   {/* Discount Tag - Only show if discount is a number and greater than 0 */}
                   {typeof service.discount === 'number' && service.discount > 0 && (
-                    <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-md z-10 flex items-center shadow-md"> {/* Adjusted position and styling */}
-                      <Tag className="h-3 w-3 mr-1" /> {/* Smaller Tag icon */}
+                    <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-md z-10 flex items-center shadow-md">
+                      <Tag className="h-3 w-3 mr-1" />
                       {`P${service.discount} OFF`}
                     </div>
                   )}
@@ -415,7 +432,7 @@ export default function ServiceManagement() {
                 <CardContent className="p-4 flex-grow">
                   <CardTitle className="text-xl font-semibold text-gray-900 mb-2">{service.name}</CardTitle>
                   <p className="text-gray-700 text-sm mb-2 line-clamp-2">{service.description}</p>
-                  
+
                   {/* Price Display Logic */}
                   <div className="flex items-center gap-2 mb-1">
                     {typeof service.discount === 'number' && service.discount > 0 ? (
