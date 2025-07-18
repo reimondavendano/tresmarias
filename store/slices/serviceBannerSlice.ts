@@ -45,58 +45,60 @@ const initialState: ServiceBannerState = {
   deleteError: null,
 };
 
-// Helper function to upload image to your Vercel API route
-const uploadImage = async (file: File): Promise<string> => {
+// Helper function to upload image to Vercel Blob
+// This encapsulates the logic previously seen in ServiceManagement.tsx
+const uploadImageToVercelBlob = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append('image', file);
-  const response = await fetch('/api/upload-image', { // Assuming this API route exists and handles the upload
+
+  const response = await fetch('/api/upload-image', {
     method: 'POST',
     body: formData,
   });
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.message || 'Failed to upload image.');
+    throw new Error(errorData.message || errorData.error || `Failed to upload image: HTTP ${response.status}`);
   }
+
   const result = await response.json();
   return result.imageUrl;
 };
 
-// Async Thunk for fetching ALL service banners (for admin view)
 export const fetchAllServiceBanners = createAsyncThunk(
   'serviceBanner/fetchAllServiceBanners',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/service-banner'); // This GET route now fetches ALL banners
+      const response = await fetch('/api/service-banner');
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch all banners from API');
+        throw new Error(errorData.message || 'Failed to fetch banners');
       }
       const data: ServiceBanner[] = await response.json();
       return data;
-    } catch (error: any) {
-      console.error('Redux Thunk Error (fetchAllServiceBanners):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while fetching all service banners.');
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'An unknown error occurred');
     }
   }
 );
 
-// Async Thunk for creating a service banner
 export const createServiceBanner = createAsyncThunk(
   'serviceBanner/createServiceBanner',
   async (payload: CreateBannerPayload, { rejectWithValue, dispatch }) => {
     try {
-      let finalImageUrl: string | null = null;
+      let imageUrl: string | null | undefined = undefined;
 
+      // If an image file is provided, upload it first
       if (payload.imageFile) {
-        finalImageUrl = await uploadImage(payload.imageFile); // Upload image first
+        imageUrl = await uploadImageToVercelBlob(payload.imageFile);
       }
 
-      const bannerDataToCreate = {
+      // Prepare data for the actual banner creation API call
+      const bannerDataForApi = {
         title: payload.title,
         description: payload.description,
         is_active: payload.is_active,
-        image_url: finalImageUrl, // Send the URL to the API
+        image_url: imageUrl, // Use the uploaded image URL
       };
 
       const response = await fetch('/api/service-banner', {
@@ -104,73 +106,71 @@ export const createServiceBanner = createAsyncThunk(
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(bannerDataToCreate),
+        body: JSON.stringify(bannerDataForApi),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create banner.');
+        throw new Error(errorData.message || 'Failed to create banner');
       }
 
-      const newBanner: ServiceBanner = await response.json();
-      dispatch(fetchAllServiceBanners()); // Re-fetch all banners to update the list and active status
-      return newBanner;
-    } catch (error: any) {
-      console.error('Redux Thunk Error (createServiceBanner):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while creating the service banner.');
+      const data: ServiceBanner = await response.json();
+      dispatch(fetchAllServiceBanners()); // Re-fetch all banners to update the list
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'An unknown error occurred during banner creation');
     }
   }
 );
 
-// Async Thunk for updating a service banner
 export const updateServiceBanner = createAsyncThunk(
   'serviceBanner/updateServiceBanner',
   async (payload: UpdateBannerPayload, { rejectWithValue, dispatch }) => {
     try {
-      let finalImageUrl: string | null | undefined; // string for new, null for clear, undefined for no change
+      let imageUrl: string | null | undefined = undefined;
 
+      // If a new image file is provided, upload it first
       if (payload.imageFile) {
-        finalImageUrl = await uploadImage(payload.imageFile); // Upload new image
-      } else if ('image_url' in payload) {
-        // This handles cases where user explicitly sets image_url to null (to clear existing)
-        // or where they pass the existing image_url to keep it.
-        finalImageUrl = payload.image_url;
+        imageUrl = await uploadImageToVercelBlob(payload.imageFile);
+      } else if (payload.image_url !== undefined) {
+        // If image_url is explicitly set to null/string from component (e.g., clear image)
+        imageUrl = payload.image_url;
       }
-      // If imageFile is not provided AND image_url is not in payload, finalImageUrl remains undefined,
-      // meaning the image_url on the backend will not be changed.
+      // If no imageFile and image_url is not explicitly set, existing image_url remains (undefined)
 
-      const bannerDataToUpdate: Partial<ServiceBanner> = {};
-      if (payload.title !== undefined) bannerDataToUpdate.title = payload.title;
-      if (payload.description !== undefined) bannerDataToUpdate.description = payload.description;
-      if (payload.is_active !== undefined) bannerDataToUpdate.is_active = payload.is_active;
-      // Only include image_url in the payload if it was explicitly updated (new file or null to clear)
-      if (finalImageUrl !== undefined) bannerDataToUpdate.image_url = finalImageUrl;
+      const updateDataForApi: Partial<Omit<ServiceBanner, 'id' | 'created_at'>> = {
+        title: payload.title,
+        description: payload.description === '' ? null : payload.description,
+        is_active: payload.is_active,
+      };
 
+      // Only include image_url in updateDataForApi if it was processed or explicitly provided
+      if (imageUrl !== undefined) {
+        updateDataForApi.image_url = imageUrl;
+      }
 
       const response = await fetch(`/api/service-banner/${payload.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(bannerDataToUpdate),
+        body: JSON.stringify(updateDataForApi),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update banner.');
+        throw new Error(errorData.message || 'Failed to update banner');
       }
 
-      const updatedBanner: ServiceBanner = await response.json();
-      dispatch(fetchAllServiceBanners()); // Re-fetch all banners to update the list and active status
-      return updatedBanner;
-    } catch (error: any) {
-      console.error('Redux Thunk Error (updateServiceBanner):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while updating the service banner.');
+      const data: ServiceBanner = await response.json();
+      dispatch(fetchAllServiceBanners()); // Re-fetch all banners to update the list
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'An unknown error occurred during banner update');
     }
   }
 );
 
-// New Async Thunk for deleting a service banner
 export const deleteServiceBanner = createAsyncThunk(
   'serviceBanner/deleteServiceBanner',
   async (id: string, { rejectWithValue, dispatch }) => {
@@ -181,34 +181,32 @@ export const deleteServiceBanner = createAsyncThunk(
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete banner.');
+        throw new Error(errorData.message || 'Failed to delete banner');
       }
 
       dispatch(fetchAllServiceBanners()); // Re-fetch all banners to update the list
       return id; // Return the ID of the deleted banner
-    } catch (error: any) {
-      console.error('Redux Thunk Error (deleteServiceBanner):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while deleting the service banner.');
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'An unknown error occurred during banner deletion');
     }
   }
 );
 
-// Async Thunk for fetching the active service banner (for public-facing frontend display)
 export const fetchActiveBanner = createAsyncThunk(
   'serviceBanner/fetchActiveBanner',
   async (_, { rejectWithValue }) => {
     try {
-      // Calls the new dedicated API route for active banner
-      const response = await fetch('/api/service-banner/active');
+      const response = await fetch('/api/service-banner/active'); // Assuming you have this endpoint
       if (!response.ok) {
+        // If 404 or other error, might mean no active banner, handle gracefully
+        if (response.status === 404) return null;
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch active banner from API');
+        throw new Error(errorData.message || 'Failed to fetch active banner');
       }
-      const data = await response.json();
-      return data as ServiceBanner | null;
-    } catch (error: any) {
-      console.error('Redux Thunk Error (fetchActiveBanner):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while fetching the service banner.');
+      const data: ServiceBanner = await response.json();
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'An unknown error occurred while fetching active banner');
     }
   }
 );
@@ -227,7 +225,7 @@ const serviceBannerSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // --- fetchAllServiceBanners (for admin list) ---
+      // --- fetchAllServiceBanners ---
       .addCase(fetchAllServiceBanners.pending, (state) => {
         state.isLoading = true;
         state.error = null;
@@ -235,15 +233,12 @@ const serviceBannerSlice = createSlice({
       .addCase(fetchAllServiceBanners.fulfilled, (state, action: PayloadAction<ServiceBanner[]>) => {
         state.isLoading = false;
         state.allBanners = action.payload;
-        // Also update activeBanner if it's one of the fetched banners, useful for direct state access
-        state.activeBanner = action.payload.find(banner => banner.is_active) || null;
         state.error = null;
       })
       .addCase(fetchAllServiceBanners.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
         state.allBanners = [];
-        state.activeBanner = null;
       })
       // --- createServiceBanner ---
       .addCase(createServiceBanner.pending, (state) => {
@@ -253,7 +248,7 @@ const serviceBannerSlice = createSlice({
       .addCase(createServiceBanner.fulfilled, (state) => {
         state.isCreating = false;
         state.createError = null;
-        // `fetchAllServiceBanners()` is dispatched within the thunk to refresh the list
+        // The list is refreshed by `fetchAllServiceBanners()` dispatched within the thunk
       })
       .addCase(createServiceBanner.rejected, (state, action) => {
         state.isCreating = false;
@@ -267,7 +262,7 @@ const serviceBannerSlice = createSlice({
       .addCase(updateServiceBanner.fulfilled, (state) => {
         state.isUpdating = false;
         state.updateError = null;
-        // `fetchAllServiceBanners()` is dispatched within the thunk to refresh the list and active status
+        // The list is refreshed by `fetchAllServiceBanners()` dispatched within the thunk
       })
       .addCase(updateServiceBanner.rejected, (state, action) => {
         state.isUpdating = false;
@@ -306,5 +301,4 @@ const serviceBannerSlice = createSlice({
 });
 
 export const { resetServiceBannerErrors } = serviceBannerSlice.actions;
-
 export default serviceBannerSlice.reducer;

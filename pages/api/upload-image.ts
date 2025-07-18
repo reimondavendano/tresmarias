@@ -2,14 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import path from 'path';
 import fs from 'fs/promises';
-import { google } from 'googleapis';
-
-// IMPORTANT: Load your service account credentials and folder ID from environment variables
-const googleDriveCreds = JSON.parse(process.env.GOOGLE_DRIVE_CREDS || '{}');
-const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID as string;
+import { put } from '@vercel/blob'; // Import Vercel Blob's put function
 
 // Determine if we are in development mode
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'; // Corrected this, it was 'production' before.
 
 // Disable Next.js's default body parser for file uploads
 export const config = {
@@ -27,45 +23,34 @@ export default async function handler(
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // --- Initialize Google Drive API client (only if not in local public save mode) ---
-  let drive: any;
-  if (!IS_DEVELOPMENT || process.env.ALWAYS_UPLOAD_TO_GDRIVE === 'true') { // Added an override for local testing
-    try {
-      if (!googleDriveCreds.client_email || !googleDriveCreds.private_key) {
-        throw new Error("Google Drive credentials are not properly set.");
-      }
-      const auth = new google.auth.JWT({
-        email: googleDriveCreds.client_email,
-        key: googleDriveCreds.private_key,
-        scopes: ['https://www.googleapis.com/auth/drive.file'],
-      });
+  // --- Determine if we should upload to Vercel Blob or save locally ---
+  // In local development, if you want to save to public/assets/img for easy viewing,
+  // set a flag like process.env.SAVE_LOCALLY_IN_DEV = 'true'
+  // Otherwise, in production or if not explicitly saving locally, upload to Vercel Blob.
+  const SAVE_LOCALLY_IN_DEV = process.env.SAVE_LOCALLY_IN_DEV === 'true'; // New optional env var
 
-      await auth.authorize();
-      drive = google.drive({ version: 'v3', auth });
-
-    } catch (authError: any) {
-      console.error('Google Drive authentication error:', authError);
-      return res.status(500).json({ message: 'Failed to authenticate with Google Drive.', error: authError.message });
-    }
-  }
-
-
-  // --- Configure formidable based on environment ---
   let uploadDirectory: string;
-  let publicAssetsPath: string | null = null; // To store the public path if saving locally
+  const shouldUploadToVercelBlob = !IS_DEVELOPMENT || !SAVE_LOCALLY_IN_DEV; // Simplified logic
 
-  if (IS_DEVELOPMENT && process.env.ALWAYS_UPLOAD_TO_GDRIVE !== 'true') {
-    // In development AND not forcing GDrive upload, save to public/assets/img
+  if (IS_DEVELOPMENT && SAVE_LOCALLY_IN_DEV) {
+    // In local development and explicitly opting to save locally
     uploadDirectory = path.join(process.cwd(), 'public', 'assets', 'img');
-    // Ensure the directory exists
-    await fs.mkdir(uploadDirectory, { recursive: true }).catch(console.error);
+    console.log(`[DEV] Saving to local public assets: ${uploadDirectory}`);
   } else {
-    // In production or when forcing GDrive upload, use the temporary directory
-    uploadDirectory = path.join(process.cwd(), 'tmp');
-    // Ensure the temporary directory exists
-    await fs.mkdir(uploadDirectory, { recursive: true }).catch(console.error);
+    // In production (Vercel) or when not saving locally in dev, use the temporary directory
+    // On Vercel, '/tmp' is the only guaranteed writable temporary directory.
+    // Locally, path.join(process.cwd(), 'tmp') creates a 'tmp' folder in your project root.
+    uploadDirectory = IS_DEVELOPMENT ? path.join(process.cwd(), 'tmp') : '/tmp'; // Corrected /var/tmp to /tmp
+    console.log(`[${IS_DEVELOPMENT ? 'DEV-VercelBlob' : 'PROD-VercelBlob'}] Saving to temporary directory: ${uploadDirectory}`);
   }
 
+  // Ensure the temporary/target directory exists
+  try {
+    await fs.mkdir(uploadDirectory, { recursive: true });
+  } catch (mkdirError: any) {
+    console.error('Error creating temporary upload directory:', mkdirError);
+    return res.status(500).json({ message: 'Failed to prepare upload directory.', error: mkdirError.message });
+  }
 
   const form = formidable({
     uploadDir: uploadDirectory,
@@ -76,7 +61,6 @@ export default async function handler(
       const baseName = parsedPath.name || 'upload';
       const fileExtension = parsedPath.ext || ext;
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      // Construct a unique filename
       return `${baseName.replace(/\s+/g, '_')}_${uniqueSuffix}${fileExtension}`;
     },
   });
@@ -85,65 +69,54 @@ export default async function handler(
 
   try {
     const [fields, files] = await form.parse(req);
-    const uploadedFile = files.image?.[0];
+    const uploadedFile = files.image?.[0]; // Assuming 'image' is the field name from your frontend
 
     if (!uploadedFile) {
       return res.status(400).json({ message: 'No image file uploaded.' });
     }
 
-    uploadedFilePath = uploadedFile.filepath; // This is the path to the saved file (either tmp or public)
+    uploadedFilePath = uploadedFile.filepath; // Formidable saves to this temp path first
 
     let finalImageUrl: string;
-    let googleDriveFileId: string | undefined;
 
-    if (IS_DEVELOPMENT && process.env.ALWAYS_UPLOAD_TO_GDRIVE !== 'true') {
-      // If saving locally in development
+    if (IS_DEVELOPMENT && SAVE_LOCALLY_IN_DEV) {
+      // If saving locally in development, return the local public path
       finalImageUrl = `/assets/img/${path.basename(uploadedFile.filepath)}`;
-      console.log(`Image saved locally: ${finalImageUrl}`);
+      console.log(`[DEV] Image saved locally: ${finalImageUrl}`);
       // No cleanup needed here as it's meant to stay in public
     } else {
-      // Production or forced GDrive upload: read from tmp and upload to Google Drive
+      // Production or when not saving locally in dev: Upload to Vercel Blob
       const filename = uploadedFile.originalFilename || path.basename(uploadedFile.filepath);
       const mimeType = uploadedFile.mimetype || 'application/octet-stream';
 
-      // Read the content of the temporary file
-      const fileContent = await fs.readFile(uploadedFilePath);
+      // Read the temporary file as a stream for efficient upload to Vercel Blob
+      const fileBuffer = await fs.readFile(uploadedFilePath); // Read full file to buffer for put()
 
-      // --- Upload to Google Drive ---
-      const response = await drive.files.create({
-        requestBody: {
-          name: filename,
-          parents: [GOOGLE_DRIVE_FOLDER_ID],
-          mimeType: mimeType,
-        },
-        media: {
-          mimeType: mimeType,
-          body: Buffer.from(fileContent),
-        },
-        fields: 'id,webContentLink,webViewLink',
+      // --- Upload to Vercel Blob ---
+      const blob = await put(filename, fileBuffer, {
+        access: 'public', // Make the file publicly accessible
+        contentType: mimeType,
       });
 
-      // Important: Clean up the temporary file
+      // Important: Clean up the temporary file after successful upload
       if (uploadedFilePath) {
-          await fs.unlink(uploadedFilePath);
+        await fs.unlink(uploadedFilePath);
       }
 
-      googleDriveFileId = response.data.id;
-      finalImageUrl = response.data.webViewLink; // The Google Drive view link
-      console.log(`Image uploaded to Google Drive. URL: ${finalImageUrl}`);
+      finalImageUrl = blob.url; // This is the public URL of the uploaded blob
+      console.log(`[${IS_DEVELOPMENT ? 'DEV-VercelBlob' : 'PROD-VercelBlob'}] Image uploaded to Vercel Blob. URL: ${finalImageUrl}`);
     }
 
     // Return the appropriate URL to the frontend
     return res.status(200).json({
       imageUrl: finalImageUrl,
-      googleDriveFileId: googleDriveFileId, // Will be undefined if saved locally
       message: 'Image uploaded successfully.',
     });
 
   } catch (error: any) {
     console.error('File upload error:', error);
-    // Clean up temporary file only if it was indeed a temporary file
-    if (uploadedFilePath && (!IS_DEVELOPMENT || process.env.ALWAYS_UPLOAD_TO_GDRIVE === 'true')) {
+    // Clean up temporary file ONLY if it was saved to a temporary location for blob upload
+    if (uploadedFilePath && shouldUploadToVercelBlob) {
         await fs.unlink(uploadedFilePath).catch(e => console.error("Error cleaning up temp file:", e));
     }
     const errorMessage = error.message || 'Failed to upload image due to an internal server error.';

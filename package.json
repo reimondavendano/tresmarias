@@ -52,6 +52,7 @@
     "@types/react-dom": "18.2.7",
     "@types/react-redux": "^7.1.33",
     "@types/react-router-dom": "^5.3.3",
+    "@vercel/blob": "^1.1.1",
     "autoprefixer": "10.4.15",
     "bcryptjs": "^3.0.2",
     "chart.js": "^4.5.0",
