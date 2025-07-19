@@ -11,11 +11,11 @@ import { ServiceBannerModal } from '@/components/serviceBanner';
 
 
 
+
 export default function Home() {
   return (
     <main className="min-h-screen">
       <Navbar />
-      
       <HeroSection />
       {/* <CreateAdmin /> */}
       <ServicesSection />

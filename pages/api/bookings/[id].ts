@@ -3,6 +3,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { fetchBookingById, updateBooking } from '@/utils/supabase/booking';
 import { BookingStatus, Booking } from '@/types'; // Import Booking type as well
+import { supabaseAdmin } from '@/utils/supabase/client/supabaseAdmin';
+
+const BOOKING_CHANNEL_NAME = 'booking_broadcast_channel'; // <--- ADD THIS CONSTANT
 
 export default async function handler(
   req: NextApiRequest,
@@ -31,17 +34,14 @@ export default async function handler(
 
   // Handle PUT requests to update a booking (e.g., status)
   } else if (req.method === 'PUT') {
-    const { status } = req.body; // Expecting only 'status' for this update
+    const { status } = req.body;
 
     if (!status || !['pending', 'confirmed', 'completed', 'cancelled'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status provided.' });
     }
 
-    // Explicitly define the type of the update object to match updateBooking's expectation.
-    // This clarifies to TypeScript that 'status' is a valid property for this update,
-    // assuming 'Booking' type (from '@/types') includes a 'status' field.
     const updates: Partial<Omit<Booking, 'id' | 'created_at'>> = {
-      status: status as BookingStatus, // Cast to BookingStatus for stronger type safety
+      status: status as BookingStatus,
     };
 
     const [updatedBooking, error] = await updateBooking(id, updates);
@@ -55,11 +55,17 @@ export default async function handler(
       return res.status(404).json({ message: 'Booking not found or could not be updated.' });
     }
 
+    // --- NEW: Send Supabase Broadcast for updated booking ---
+    await supabaseAdmin.channel(BOOKING_CHANNEL_NAME).send({
+        type: 'broadcast',
+        event: 'booking_updated', // Use 'booking_updated' event
+        payload: updatedBooking, // Send the full updated booking object
+    });
+
     return res.status(200).json(updatedBooking);
 
-  // Handle other HTTP methods not allowed
   } else {
-    res.setHeader('Allow', ['GET', 'PUT']); // Allow GET and PUT methods for this endpoint
+    res.setHeader('Allow', ['GET', 'PUT']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

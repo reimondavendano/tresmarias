@@ -27,7 +27,7 @@ export const fetchActiveServiceBanner = async (): Promise<[ServiceBanner | null,
 
 /**
  * Fetches all service banners from the database.
- * This function should be called from a server-side context (e.g., an API route).
+ * This function should be called from a server-side context (e.g., an API route).\
  */
 export const fetchAllServiceBanners = async (): Promise<[ServiceBanner[] | null, any | null]> => {
   const { data, error } = await supabaseAdmin
@@ -39,23 +39,19 @@ export const fetchAllServiceBanners = async (): Promise<[ServiceBanner[] | null,
     console.error('Supabase Service Banner Server Error: Failed to fetch all banners:', error.message);
     return [null, error];
   }
-  // Ensure we always return an array, even if data is null
-  return [(data as ServiceBanner[]) || [], null];
+  return [data as ServiceBanner[], null];
 };
 
 /**
  * Creates a new service banner.
- * If the new banner is set to active, it uses the RPC function to handle deactivation of others.
  * This function should be called from a server-side context (e.g., an API route).
  */
 export const createServiceBanner = async (
   bannerData: Omit<ServiceBanner, 'id' | 'created_at'>
 ): Promise<[ServiceBanner | null, any | null]> => {
-  const { is_active, ...rest } = bannerData;
-
   const { data, error } = await supabaseAdmin
     .from('tbl_service_banner')
-    .insert({ ...rest, is_active })
+    .insert(bannerData)
     .select()
     .single();
 
@@ -64,14 +60,14 @@ export const createServiceBanner = async (
     return [null, error];
   }
 
-  // If the newly created banner is active, call the RPC function to ensure exclusivity
-  if (is_active && data?.id) {
+  // If the newly created banner is active, call the RPC to ensure it's the only active one
+  if (bannerData.is_active && data?.id) {
     const { error: rpcError } = await supabaseAdmin.rpc('set_active_service_banner', {
-      p_banner_id: data.id,
+      p_banner_id: data.id.toString(),
     });
     if (rpcError) {
-      console.error('Supabase Service Banner Server Error: Failed to set active via RPC after create:', rpcError.message);
-      // Decide if you want to rollback or just log this error. For now, we log and proceed.
+      console.error('Supabase Service Banner Server Error: Failed to set active via RPC after creation:', rpcError.message);
+      // Log the error but don't prevent the banner from being created
     }
   }
 
@@ -80,7 +76,7 @@ export const createServiceBanner = async (
 
 /**
  * Updates an existing service banner by ID.
- * If 'is_active' is set to true for this banner, it uses the RPC function to handle deactivation of others.
+ * If `is_active` is explicitly set to `true`, it calls a Supabase RPC to deactivate all other banners.
  * This function should be called from a server-side context (e.g., an API route).
  */
 export const updateServiceBanner = async (
@@ -103,7 +99,7 @@ export const updateServiceBanner = async (
   // If is_active was explicitly set to true in the update, call the RPC function
   if (bannerData.is_active === true && data?.id) {
     const { error: rpcError } = await supabaseAdmin.rpc('set_active_service_banner', {
-      p_banner_id: data.id,
+      p_banner_id: data.id.toString(), // <--- Add .toString() here to convert number/bigint to string
     });
     if (rpcError) {
       console.error('Supabase Service Banner Server Error: Failed to set active via RPC after update:', rpcError.message);
@@ -116,7 +112,7 @@ export const updateServiceBanner = async (
 
 /**
  * Deletes a service banner by ID.
- * This function should be called from a server-side context (e.g., an API route).
+ * This function should be called from a server-side context (e.g., an API route).\
  */
 export const deleteServiceBanner = async (id: string): Promise<[boolean, any | null]> => {
   const { error } = await supabaseAdmin
@@ -129,4 +125,23 @@ export const deleteServiceBanner = async (id: string): Promise<[boolean, any | n
     return [false, error];
   }
   return [true, null];
+};
+
+/**
+ * Fetches a single service banner by its ID.
+ * This function should be called from a server-side context (e.g., an API route).
+ */
+export const fetchServiceBannerById = async (id: string): Promise<[ServiceBanner | null, any | null]> => {
+  const { data, error } = await supabaseAdmin
+    .from('tbl_service_banner')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error(`Supabase Service Banner Server Error: Failed to fetch banner by ID ${id}:`, error.message);
+    return [null, error];
+  }
+
+  return [data as ServiceBanner, null];
 };

@@ -2,6 +2,8 @@
 
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Booking, BookingData, BookingStatus } from '@/types';
+import { supabaseBrowser } from '@/utils/supabase/client/supabaseBrowser'; // Assuming you have a client-side Supabase client
+import { RootState } from '@/store/store'; 
 
 // Define the state interface for the booking slice
 interface BookingState {
@@ -17,11 +19,13 @@ interface BookingState {
   checkAvailabilityError: string | null; // New: Error for availability check
   isAvailable: boolean | null;   // New: Stores the availability result (true/false/null)
 
-  // New: For pagination and search
+  // For pagination and search
   currentPage: number;
   pageSize: number;
   totalBookings: number;
   totalPages: number;
+  searchTerm: string;
+  statusFilter: string;
 }
 
 // Define the initial state with new properties
@@ -39,9 +43,11 @@ const initialState: BookingState = {
   isAvailable: null, // Initial state for availability
 
   currentPage: 1,
-  pageSize: 10, // Default page size
+  pageSize: 10,
   totalBookings: 0,
   totalPages: 0,
+  searchTerm: '', // <--- ENSURE THIS IS AN EMPTY STRING
+  statusFilter: 'all', // <--- ENSURE THIS IS A DEFAULT STRING LIKE 'all'
 };
 
 // Async thunk for fetching bookings with pagination, search, and filters
@@ -49,28 +55,36 @@ export const fetchBookings = createAsyncThunk(
   'booking/fetchBookings',
   async ({ page, pageSize, searchTerm, statusFilter }: { page?: number; pageSize?: number; searchTerm?: string; statusFilter?: string }, { getState, rejectWithValue }) => {
     try {
-      const state = getState() as { booking: BookingState }; // Access current state for defaults
-      const currentPage = page ?? state.booking.currentPage;
-      const current_pageSize = pageSize ?? state.booking.pageSize;
-      const current_searchTerm = searchTerm ?? '';
-      const current_statusFilter = statusFilter ?? 'all';
+      // Access current state for defaults using the correctly typed RootState
+      const state = getState() as RootState;
 
-      // Construct URLSearchParams for clean API calls
+      // Determine current values, falling back to Redux state if not provided in dispatch
+      const currentPage = page ?? state.booking.currentPage;
+      const currentPagesize = pageSize ?? state.booking.pageSize;
+      const currentSearchTerm = searchTerm ?? state.booking.searchTerm; // Fallback to state's searchTerm
+      const currentStatusFilter = statusFilter ?? state.booking.statusFilter; // Fallback to state's statusFilter
+
+      // Construct URLSearchParams for clean API calls.
+      // Your backend /api/bookings/index.ts route will handle converting
+      // statusFilter='all' to an empty string for the Supabase RPC.
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        pageSize: current_pageSize.toString(),
-        searchTerm: current_searchTerm,
-        statusFilter: current_statusFilter,
+        pageSize: currentPagesize.toString(),
+        searchTerm: currentSearchTerm,
+        statusFilter: currentStatusFilter,
       });
 
+      // Perform the fetch request using the constructed query string
       const response = await fetch(`/api/bookings?${params.toString()}`);
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch bookings');
       }
-      // API now returns { bookings, totalCount }
+
+      // API now correctly returns { bookings, totalCount }
       const data: { bookings: Booking[], totalCount: number } = await response.json();
-      return data; 
+      return data;
     } catch (error: any) {
       console.error('Redux Thunk Error (fetchBookings):', error);
       return rejectWithValue(error.message || 'An unknown error occurred while fetching bookings.');
@@ -78,7 +92,7 @@ export const fetchBookings = createAsyncThunk(
   }
 );
 
-// Async thunk for creating a booking
+// Async thunk to create a new booking
 export const createBooking = createAsyncThunk(
   'booking/createBooking',
   async (bookingData: BookingData, { rejectWithValue }) => {
@@ -96,61 +110,66 @@ export const createBooking = createAsyncThunk(
         throw new Error(errorData.message || 'Failed to create booking');
       }
 
-      const data: Booking = await response.json();
-      return data;
+      const newBooking: Booking = await response.json();
+      return newBooking;
     } catch (error: any) {
-      console.error('Redux Thunk Error (createBooking):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while creating booking.');
+      return rejectWithValue(error.message);
     }
   }
 );
 
-// Async thunk for updating booking status
+// Async thunk to update booking status
 export const updateBookingStatus = createAsyncThunk(
   'booking/updateBookingStatus',
   async ({ id, status }: { id: string; status: BookingStatus }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/bookings/${id}`, { // Target specific booking by ID
-        method: 'PUT', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }), // Only send the status to update
+      const response = await fetch(`/api/bookings/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update booking status');
       }
-      const data: Booking = await response.json(); // API should return the updated booking
-      return data;
+
+      const updatedBooking: Booking = await response.json();
+      return updatedBooking;
     } catch (error: any) {
-      console.error('Redux Thunk Error (updateBookingStatus):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while updating booking status.');
+      return rejectWithValue(error.message);
     }
   }
 );
 
-// Async thunk for checking availability
 export const checkAvailability = createAsyncThunk(
   'booking/checkAvailability',
-  async ({ date, time, stylistId }: { date: string; time: string; stylistId?: string }, { rejectWithValue }) => {
+  async ({ date, time, stylistId }: { date: string; time: string; stylistId?: string | null }, { rejectWithValue }) => {
     try {
-      const params = new URLSearchParams({ date, time });
-      if (stylistId) params.append('stylistId', stylistId);
-      
-      const response = await fetch(`/api/bookings/check-availability?${params}`);
+      const queryParams = new URLSearchParams({ date, time });
+      if (stylistId) {
+        queryParams.append('stylistId', stylistId);
+      }
+      // FIX THIS LINE: Change the API endpoint URL
+      const response = await fetch(`/api/bookings/check-availability?${queryParams.toString()}`); // CORRECTED PATH
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to check availability');
+        // It's good to log the full error response for debugging API issues
+        console.error('API Error Response:', errorData);
+        throw new Error(errorData.message || 'Failed to check availability.');
       }
-      
-      const data = await response.json();
-      return data.available; // API returns { available: boolean }
+      const data: { available: boolean } = await response.json();
+      return data.available;
     } catch (error: any) {
       console.error('Redux Thunk Error (checkAvailability):', error);
-      return rejectWithValue(error.message || 'An unknown error occurred while checking availability.');
+      return rejectWithValue(error.message || 'An unknown error occurred during availability check.');
     }
   }
 );
+
 
 const bookingSlice = createSlice({
   name: 'booking',
@@ -162,61 +181,83 @@ const bookingSlice = createSlice({
     clearCurrentBooking: (state) => {
       state.currentBooking = {};
     },
-    // addBooking might be redundant if fetchBookings is called after creation
-    // addBooking: (state, action: PayloadAction<Booking>) => {
-    //   state.bookings.unshift(action.payload); 
-    // },
     clearError: (state) => {
       state.error = null;
       state.createError = null;
-      state.updateStatusError = null;     // Clear update status error
-      state.checkAvailabilityError = null; // Clear check availability error
+      state.updateStatusError = null;
+      state.checkAvailabilityError = null;
     },
-    setPage: (state, action: PayloadAction<number>) => { // New reducer for pagination
+    setPage: (state, action: PayloadAction<number>) => {
         state.currentPage = action.payload;
     },
-    setPageSize: (state, action: PayloadAction<number>) => { // New reducer for page size
+    setPageSize: (state, action: PayloadAction<number>) => {
         state.pageSize = action.payload;
+    },
+    // NEW REDUCERS FOR REALTIME (BROADCAST) UPDATES
+    addRealtimeBooking: (state, action: PayloadAction<Booking>) => {
+      // Add the new booking if it's not already in the current list
+      const exists = state.bookings.some(b => b.id === action.payload.id);
+      if (!exists) {
+        state.bookings.unshift(action.payload); // Add to the beginning for freshness
+        state.totalBookings += 1; // Increment total count
+        state.totalPages = Math.ceil(state.totalBookings / state.pageSize);
+        // Ensure the current page's view is not overflowing if adding to it directly
+        state.bookings = state.bookings.slice(0, state.pageSize); // Keep only visible items if strict
+      }
+    },
+    updateRealtimeBooking: (state, action: PayloadAction<Booking>) => {
+      const index = state.bookings.findIndex(booking => booking.id === action.payload.id);
+      if (index !== -1) {
+        state.bookings[index] = action.payload;
+      } else {
+        // If the updated booking wasn't in the current view (e.g., on another page),
+        // we could potentially add it or rely on the `fetchBookings` triggered by broadcast.
+        // For simplicity, we update only if present.
+      }
+    },
+    deleteRealtimeBooking: (state, action: PayloadAction<string>) => {
+      state.bookings = state.bookings.filter(booking => booking.id !== action.payload);
+      state.totalBookings -= 1; // Decrement total count
+      state.totalPages = Math.ceil(state.totalBookings / state.pageSize);
     },
   },
   extraReducers: (builder) => {
     builder
-      // --- fetchBookings ---
+      // Cases for fetchBookings
       .addCase(fetchBookings.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchBookings.fulfilled, (state, action: PayloadAction<{ bookings: Booking[], totalCount: number }>) => {
+      .addCase(fetchBookings.fulfilled, (state, action: PayloadAction<{ bookings: Booking[]; totalCount: number }>) => {
         state.isLoading = false;
         state.bookings = action.payload.bookings;
         state.totalBookings = action.payload.totalCount;
-        state.totalPages = Math.ceil(action.payload.totalCount / state.pageSize); // Calculate total pages
-        state.error = null;
+        state.totalPages = Math.ceil(action.payload.totalCount / state.pageSize);
       })
       .addCase(fetchBookings.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
-        state.bookings = [];
-        state.totalBookings = 0;
-        state.totalPages = 0;
       })
-      // --- createBooking ---
+
+      // Cases for createBooking
       .addCase(createBooking.pending, (state) => {
         state.isCreating = true;
         state.createError = null;
       })
       .addCase(createBooking.fulfilled, (state, action: PayloadAction<Booking>) => {
         state.isCreating = false;
-        // If you rely on re-fetching bookings after creation, you don't need to unshift here:
-        // state.bookings.unshift(action.payload); 
         state.createError = null;
-        state.currentBooking = {};
+        state.currentBooking = {}; // Clear the form after successful creation
+        // The addRealtimeBooking reducer will handle adding this via the Broadcast event,
+        // so we don't need to directly modify `state.bookings` here.
+        // If you were NOT using real-time, you'd unshift it here: state.bookings.unshift(action.payload);
       })
       .addCase(createBooking.rejected, (state, action) => {
         state.isCreating = false;
         state.createError = action.payload as string;
       })
-      // --- updateBookingStatus ---
+
+      // Cases for updateBookingStatus
       .addCase(updateBookingStatus.pending, (state) => {
         state.isUpdatingStatus = true;
         state.updateStatusError = null;
@@ -224,17 +265,16 @@ const bookingSlice = createSlice({
       .addCase(updateBookingStatus.fulfilled, (state, action: PayloadAction<Booking>) => {
         state.isUpdatingStatus = false;
         state.updateStatusError = null;
-        // Find and update the specific booking in the array
-        const index = state.bookings.findIndex(booking => booking.id === action.payload.id);
-        if (index !== -1) {
-          state.bookings[index] = action.payload;
-        }
+        // The updateRealtimeBooking reducer will handle this via the Broadcast event,
+        // so we don't need to directly modify `state.bookings` here.
+        // If you were NOT using real-time, you'd find and update the booking here.
       })
       .addCase(updateBookingStatus.rejected, (state, action) => {
         state.isUpdatingStatus = false;
         state.updateStatusError = action.payload as string;
       })
-      // --- checkAvailability ---
+
+      // Cases for checkAvailability
       .addCase(checkAvailability.pending, (state) => {
         state.isCheckingAvailability = true;
         state.checkAvailabilityError = null;
@@ -253,13 +293,16 @@ const bookingSlice = createSlice({
   },
 });
 
-export const { 
-  setCurrentBooking, 
-  clearCurrentBooking, 
-  // addBooking, // Consider removing if you always re-fetch after create
+export const {
+  setCurrentBooking,
+  clearCurrentBooking,
   clearError,
-  setPage, // Export new reducer
-  setPageSize // Export new reducer
+  setPage,
+  setPageSize,
+  // Export new realtime reducers for direct dispatch from broadcast listener
+  addRealtimeBooking,
+  updateRealtimeBooking,
+  deleteRealtimeBooking,
 } = bookingSlice.actions;
 
 export default bookingSlice.reducer;

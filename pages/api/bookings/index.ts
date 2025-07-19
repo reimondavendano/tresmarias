@@ -1,7 +1,8 @@
 // pages/api/bookings/index.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { fetchPaginatedBookings, createBooking } from '@/utils/supabase/booking'; // Make sure createBooking is imported if you handle POST here
+import { fetchPaginatedBookings, createBookingAtomic } from '@/utils/supabase/booking';
+import { supabaseAdmin } from '@/utils/supabase/client/supabaseAdmin'; // Import supabaseAdmin for broadcasting
 
 export default async function handler(
   req: NextApiRequest,
@@ -45,10 +46,16 @@ export default async function handler(
     // This block handles the POST request for creating new bookings.
     try {
       const bookingData = req.body; // Assuming req.body contains the booking data
-      const [newBooking, error] = await createBooking(bookingData);
+
+      // Use the atomic booking function
+      const [newBooking, error] = await createBookingAtomic(bookingData);
 
       if (error) {
         console.error('API Route Error: POST /api/bookings -', error.message);
+        // Provide more specific error messages for UI feedback
+        if (error.message.includes('Slot is already booked or pending')) {
+            return res.status(409).json({ message: 'This slot is no longer available. Please choose another.', error: error.message });
+        }
         return res.status(500).json({ message: 'Failed to create booking', error: error.message });
       }
 
@@ -56,13 +63,21 @@ export default async function handler(
         return res.status(400).json({ message: 'Failed to create booking: No data returned.' });
       }
 
+     
+      // ** NEW: Send Supabase Broadcast for new booking **
+      // Use the 'booking_broadcast_channel' name consistent with the frontend listener
+      await supabaseAdmin.channel('booking_broadcast_channel').send({
+          type: 'broadcast',
+          event: 'new_booking',
+          payload: newBooking, // Send the full new booking object
+      });
+
       return res.status(201).json(newBooking);
     } catch (error: any) {
       console.error('API Route Error: POST /api/bookings -', error.message);
       return res.status(500).json({ message: 'An unexpected error occurred while creating booking.', error: error.message });
     }
-  }
-   else {
+  } else {
     res.setHeader('Allow', ['GET', 'POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }

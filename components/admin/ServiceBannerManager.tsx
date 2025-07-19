@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import {
-  fetchAllServiceBanners, // Ensure this is imported
+  fetchAllServiceBanners,
   createServiceBanner,
   updateServiceBanner,
   deleteServiceBanner,
@@ -32,275 +32,291 @@ export default function ServiceBannerManager() {
   );
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [currentBanner, setCurrentBanner] = useState<Partial<ServiceBanner> | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [currentBanner, setCurrentBanner] = useState<ServiceBanner | null>(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    is_active: false,
+  });
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+  // --- NEW STATE FOR RADIO GROUP SELECTION ---
   const [selectedActiveBannerId, setSelectedActiveBannerId] = useState<string | null>(null);
 
-  // New useEffect to fetch all banners on component mount
   useEffect(() => {
     dispatch(fetchAllServiceBanners());
-  }, [dispatch]); // Run once on mount
+  }, [dispatch]);
 
-  // Initialize selectedActiveBannerId from Redux state on load or when allBanners changes
+  // --- NEW useEffect to initialize selectedActiveBannerId ---
   useEffect(() => {
-    if (!isLoading && allBanners.length > 0) {
-      const active = allBanners.find(banner => banner.is_active);
-      setSelectedActiveBannerId(active ? active.id : null);
-    } else if (!isLoading && allBanners.length === 0) {
-      setSelectedActiveBannerId(null);
+    // Find the banner that is currently active from the fetched list
+    const active = allBanners.find(banner => banner.is_active);
+    if (active) {
+      setSelectedActiveBannerId(active.id);
+    } else {
+      setSelectedActiveBannerId(null); // No banner is active
     }
-  }, [allBanners, isLoading]);
+  }, [allBanners]); // Re-run when allBanners changes (e.g., after initial fetch or an update)
 
-  // Error and Success toasts for general fetch errors
   useEffect(() => {
-    if (error) { // General fetch error
-      toast.error(`Error fetching banners: ${error}`);
+    if (error || createError || updateError || deleteError) {
+      const errorMessage = error || createError || updateError || deleteError;
+      toast.error(errorMessage, { id: 'banner-action-error' });
       dispatch(resetServiceBannerErrors());
     }
-  }, [error, dispatch]);
+  }, [error, createError, updateError, deleteError, dispatch]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadedFile(file);
+      setPreviewImageUrl(URL.createObjectURL(file));
+    } else {
+      setUploadedFile(null);
+      setPreviewImageUrl(null);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
 
   const handleEditClick = (banner: ServiceBanner) => {
     setCurrentBanner(banner);
-    setPreviewImage(banner.image_url && banner.image_url !== 'EMPTY' ? banner.image_url : null);
-    setImageFile(null);
+    setFormData({
+      title: banner.title,
+      description: banner.description || '',
+      is_active: banner.is_active,
+    });
+    setPreviewImageUrl(banner.image_url);
+    setUploadedFile(null); // Clear uploaded file when editing an existing banner
     setIsFormOpen(true);
   };
 
-  const handleCreateClick = () => {
-    setCurrentBanner({ is_active: false });
-    setPreviewImage(null);
-    setImageFile(null);
-    setIsFormOpen(true);
-  };
-
-  const handleCancelForm = () => {
-    setIsFormOpen(false);
+  const handleCancelEdit = () => {
     setCurrentBanner(null);
-    setPreviewImage(null);
-    setImageFile(null);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      setPreviewImage(URL.createObjectURL(file));
-    } else {
-      setImageFile(null);
-      setPreviewImage(currentBanner?.image_url && currentBanner.image_url !== 'EMPTY' ? currentBanner.image_url : null);
-    }
+    setFormData({ title: '', description: '', is_active: false });
+    setUploadedFile(null);
+    setPreviewImageUrl(null);
+    setIsFormOpen(false);
+    dispatch(resetServiceBannerErrors());
   };
 
   const handleDeleteClick = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this banner?')) {
-      const loadingToastId = toast.loading('Deleting banner...');
-      const resultAction = await dispatch(deleteServiceBanner(id));
-      if (deleteServiceBanner.fulfilled.match(resultAction)) {
-        toast.success('Banner deleted successfully!', { id: loadingToastId });
-      } else {
-        toast.error(`Failed to delete banner: ${deleteError || 'An unknown error occurred.'}`, { id: loadingToastId });
-        dispatch(resetServiceBannerErrors());
-      }
+    toast.loading('Deleting banner...', { id: 'delete-banner' });
+    const resultAction = await dispatch(deleteServiceBanner(id));
+    if (deleteServiceBanner.fulfilled.match(resultAction)) {
+      toast.success('Banner deleted successfully!', { id: 'delete-banner' });
+    } else {
+      const errorMessage = resultAction.payload as string || 'Failed to delete banner.';
+      toast.error(errorMessage, { id: 'delete-banner' });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!currentBanner?.title) {
-      toast.error('Title is required.');
-      return;
-    }
-
-    if (!currentBanner?.id && !imageFile && (!previewImage || previewImage === 'EMPTY')) {
-      toast.error('An image is recommended for new banners to be fully visible.');
-    }
-
-    let loadingToastId: string | number | undefined;
-
-    if (currentBanner.id) {
+    if (currentBanner) {
+      // Update existing banner
+      toast.loading('Updating banner...', { id: 'update-banner' });
       const payload: UpdateBannerPayload = {
         id: currentBanner.id,
-        title: currentBanner.title,
-        description: currentBanner.description === '' ? null : currentBanner.description,
-        is_active: currentBanner.is_active,
+        title: formData.title,
+        description: formData.description,
+        is_active: formData.is_active,
+        imageFile: uploadedFile || undefined, // Pass file if new one is selected
+        image_url: uploadedFile ? undefined : (previewImageUrl === null ? null : currentBanner.image_url), // Handle image_url explicitly
       };
 
-      if (imageFile) {
-        payload.imageFile = imageFile;
-      } else if (previewImage === null) {
-        payload.image_url = null;
-      } else if (currentBanner.image_url === previewImage && currentBanner.image_url !== 'EMPTY') {
-        delete payload.image_url;
-      } else if (currentBanner.image_url === 'EMPTY' && previewImage === null) {
-        payload.image_url = null;
-      } else if (currentBanner.image_url === 'EMPTY' && previewImage === 'EMPTY') {
-        delete payload.image_url;
-      }
-
-      loadingToastId = toast.loading('Updating banner...');
       const resultAction = await dispatch(updateServiceBanner(payload));
       if (updateServiceBanner.fulfilled.match(resultAction)) {
-        toast.success('Banner updated successfully!', { id: loadingToastId });
-        handleCancelForm();
+        toast.success('Banner updated successfully!', { id: 'update-banner' });
+        handleCancelEdit();
+        dispatch(fetchAllServiceBanners()); // Re-fetch all banners to ensure UI syncs with DB state
       } else {
-        toast.error(`Failed to update banner: ${updateError || 'An unknown error occurred.'}`, { id: loadingToastId });
-        dispatch(resetServiceBannerErrors());
+        const errorMessage = resultAction.payload as string || 'Failed to update banner.';
+        toast.error(errorMessage, { id: 'update-banner' });
       }
     } else {
+      // Create new banner
+      toast.loading('Creating banner...', { id: 'create-banner' });
       const payload: CreateBannerPayload = {
-        title: currentBanner.title,
-        description: currentBanner.description === '' ? null : currentBanner.description,
-        is_active: currentBanner.is_active || false,
-        imageFile: imageFile || undefined,
+        title: formData.title,
+        description: formData.description,
+        is_active: formData.is_active,
+        imageFile: uploadedFile || undefined,
       };
 
-      loadingToastId = toast.loading('Creating banner...');
       const resultAction = await dispatch(createServiceBanner(payload));
       if (createServiceBanner.fulfilled.match(resultAction)) {
-        toast.success('Banner created successfully!', { id: loadingToastId });
-        handleCancelForm();
+        toast.success('Banner created successfully!', { id: 'create-banner' });
+        setFormData({ title: '', description: '', is_active: false });
+        setUploadedFile(null);
+        setPreviewImageUrl(null);
+        setIsFormOpen(false);
+        dispatch(fetchAllServiceBanners()); // Re-fetch all banners to ensure UI syncs with DB state
       } else {
-        toast.error(`Failed to create banner: ${createError || 'An unknown error occurred.'}`, { id: loadingToastId });
-        dispatch(resetServiceBannerErrors());
+        const errorMessage = resultAction.payload as string || 'Failed to create banner.';
+        toast.error(errorMessage, { id: 'create-banner' });
       }
     }
   };
 
-  const handleRadioChange = async (bannerId: string) => {
-    if (selectedActiveBannerId !== bannerId) {
-      setSelectedActiveBannerId(bannerId);
+  // --- NEW FUNCTION TO HANDLE RADIO GROUP CHANGE ---
+  const handleActivateBanner = useCallback(async (bannerId: string) => {
+    // ... (optimistic UI update and toast loading)
 
-      const loadingToastId = toast.loading('Updating active banner...');
-      const resultAction = await dispatch(updateServiceBanner({
-        id: bannerId,
-        is_active: true,
-      }));
+      const payload: UpdateBannerPayload = {
+          id: bannerId,
+          is_active: true, // This correctly signals the intent to activate THIS banner
+      };
+
+      // Dispatch the update thunk
+      const resultAction = await dispatch(updateServiceBanner(payload));
 
       if (updateServiceBanner.fulfilled.match(resultAction)) {
-        toast.success('Active banner updated successfully!', { id: loadingToastId });
+          toast.success('Banner successfully set as active!', { id: 'activate-banner' });
+          dispatch(fetchAllServiceBanners()); // <--- This refetches data, crucial for UI update
       } else {
-        toast.error(`Failed to update active banner: ${updateError || 'An unknown error occurred.'}`, { id: loadingToastId });
-        setSelectedActiveBannerId(allBanners.find(b => b.is_active)?.id || null);
-        dispatch(resetServiceBannerErrors());
+          // ... (error handling)
       }
-    }
-  };
+  }, [dispatch, selectedActiveBannerId, allBanners]);
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Service Banner Management</h1>
+    <div className="container mx-auto p-6">
+      <Card className="mb-8 p-6 shadow-lg rounded-xl">
+        <CardHeader className="mb-4">
+          <CardTitle className="text-2xl font-bold text-salon-dark">Manage Service Banners</CardTitle>
+          <p className="text-gray-600">Create, edit, and set the active service banner for your homepage.</p>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => setIsFormOpen(!isFormOpen)} className="mb-6 bg-salon-primary hover:bg-salon-primary/90">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            {isFormOpen ? 'Close Form' : 'Add New Banner'}
+          </Button>
 
-      <Button onClick={handleCreateClick} className="mb-6">
-        <PlusCircle className="mr-2 h-4 w-4" /> Create New Banner
-      </Button>
-
-      {isFormOpen && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>{currentBanner?.id ? 'Edit Service Banner' : 'Create New Service Banner'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+          {isFormOpen && (
+            <form onSubmit={handleSubmit} className="space-y-6 bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
+              <h3 className="text-xl font-semibold text-salon-dark">
+                {currentBanner ? 'Edit Banner' : 'Create New Banner'}
+              </h3>
               <div>
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">Title</Label>
                 <Input
+                  type="text"
                   id="title"
-                  value={currentBanner?.title || ''}
-                  onChange={(e) => setCurrentBanner({ ...currentBanner, title: e.target.value })}
+                  name="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
                   required
+                  className="w-full"
+                  disabled={isCreating || isUpdating}
                 />
               </div>
               <div>
-                <Label htmlFor="description">Description (Optional)</Label>
+                <Label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</Label>
                 <Textarea
                   id="description"
-                  value={currentBanner?.description || ''}
-                  onChange={(e) => setCurrentBanner({ ...currentBanner, description: e.target.value })}
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full"
+                  disabled={isCreating || isUpdating}
                 />
               </div>
               <div>
-                <Label htmlFor="image">Image</Label>
-                <Input id="image" type="file" accept="image/*" onChange={handleFileChange} />
-                {(previewImage || (currentBanner?.image_url && currentBanner.image_url !== 'EMPTY' && !imageFile)) && (
-                  <div className="mt-4 flex items-center space-x-4">
-                    {previewImage && previewImage !== 'EMPTY' ? (
-                        <Image src={previewImage} alt="New Banner Preview" width={200} height={100} className="rounded-md object-cover" />
-                    ) : (currentBanner?.image_url && currentBanner.image_url !== 'EMPTY' &&
-                      <Image src={currentBanner.image_url} alt="Current Banner" width={200} height={100} className="rounded-md object-cover" />
-                    )}
-                    {(previewImage || (currentBanner?.image_url && currentBanner.image_url !== 'EMPTY')) && !imageFile && (
-                        <Button type="button" variant="outline" size="sm" onClick={() => {
-                            setPreviewImage(null);
-                            setCurrentBanner(prev => prev ? {...prev, image_url: null} : null);
-                        }}>
-                            Clear Image
-                        </Button>
-                    )}
+                <Label htmlFor="imageFile" className="block text-sm font-medium text-gray-700 mb-1">Image</Label>
+                <Input
+                  type="file"
+                  id="imageFile"
+                  name="imageFile"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="w-full border p-2 rounded-md"
+                  disabled={isCreating || isUpdating}
+                />
+                {previewImageUrl && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Image Preview:</p>
+                    <Image src={previewImageUrl} alt="Banner Preview" width={200} height={100} className="rounded-md object-cover" />
                   </div>
-                )}
-                {!previewImage && (!currentBanner?.image_url || currentBanner?.image_url === 'EMPTY') && (
-                    <p className="text-sm text-gray-500 mt-2 flex items-center"><ImageIcon className="mr-1 h-4 w-4"/> No image selected.</p>
                 )}
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  id="isActive"
-                  checked={currentBanner?.is_active || false}
-                  onCheckedChange={(checked) => setCurrentBanner({ ...currentBanner, is_active: Boolean(checked) })}
-                  disabled={!!currentBanner?.id}
+                  id="is_active"
+                  name="is_active"
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) => handleInputChange({
+                    target: { name: 'is_active', type: 'checkbox', checked: checked as boolean, value: '' }
+                  } as React.ChangeEvent<HTMLInputElement>)}
+                  disabled={isCreating || isUpdating}
                 />
-                <Label htmlFor="isActive">Set as Active Banner (for new banners only)</Label>
+                <Label htmlFor="is_active" className="text-sm font-medium text-gray-700">Set as Active Banner (Only one can be active)</Label>
               </div>
-              <div className="flex space-x-2">
-                <Button type="submit" disabled={isCreating || isUpdating}>
-                  {isCreating || isUpdating ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    currentBanner?.id ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />
-                  )}
-                  {currentBanner?.id ? 'Update Banner' : 'Create Banner'}
-                </Button>
-                <Button type="button" variant="outline" onClick={handleCancelForm}>
+              <div className="flex justify-end space-x-4">
+                <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isCreating || isUpdating}>
                   Cancel
+                </Button>
+                <Button type="submit" className="bg-salon-primary hover:bg-salon-primary/90" disabled={isCreating || isUpdating}>
+                  {isCreating || isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {currentBanner ? (isUpdating ? 'Updating...' : 'Update Banner') : (isCreating ? 'Creating...' : 'Create Banner')}
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
-      <h2 className="text-2xl font-bold mb-4">All Banners</h2>
+      <h2 className="text-2xl font-bold text-salon-dark mb-6">Current Banners</h2>
+
       {isLoading ? (
-        <div className="flex justify-center items-center h-48">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          <span className="ml-2 text-lg">Loading banners...</span>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-salon-primary mx-auto my-12" />
+      ) : error ? (
+        <p className="text-red-500 text-center my-12">Error loading banners: {error}</p>
       ) : allBanners.length === 0 ? (
-        <p className="text-center text-gray-500">No banners created yet.</p>
+        <p className="text-gray-500 text-center my-12">No service banners created yet.</p>
       ) : (
         <RadioGroup
-          onValueChange={handleRadioChange}
-          value={selectedActiveBannerId || ''}
+          value={selectedActiveBannerId || ''} // Use the state variable here
+          onValueChange={handleActivateBanner} // Call your new handler
           className="space-y-4"
         >
           {allBanners.map((banner) => (
-            <Card key={banner.id} className={selectedActiveBannerId === banner.id ? "border-2 border-blue-500" : ""}>
-              <CardContent className="p-4 flex items-center space-x-4">
-                <RadioGroupItem value={banner.id} id={`banner-${banner.id}`} disabled={isUpdating || isDeleting} />
-                <Label htmlFor={`banner-${banner.id}`} className="flex-grow flex items-center space-x-4 cursor-pointer">
-                  {banner.image_url && banner.image_url !== 'EMPTY' ? (
+            <Card
+              key={banner.id}
+              // The active class should be based on `selectedActiveBannerId` from state
+              className={`flex items-center space-x-4 p-4 border rounded-lg ${
+                selectedActiveBannerId === banner.id ? 'border-salon-primary ring-2 ring-salon-primary' : ''
+              }`}
+            >
+              <CardContent className="flex items-center space-x-4 p-0 flex-grow">
+                <RadioGroupItem value={banner.id} id={`banner-${banner.id}`} />
+                <Label
+                  htmlFor={`banner-${banner.id}`}
+                  className="flex flex-grow items-center space-x-4 cursor-pointer"
+                >
+                  {banner.image_url ? (
                     <Image
                       src={banner.image_url}
                       alt={banner.title}
-                      width={100}
-                      height={50}
-                      className="rounded-md object-cover flex-shrink-0"
+                      width={80}
+                      height={80}
+                      className="rounded-md object-cover h-20 w-20"
                     />
                   ) : (
-                    <div className="w-[100px] h-[50px] bg-gray-200 flex items-center justify-center rounded-md text-gray-500 text-xs flex-shrink-0">
-                      No Image
+                    <div className="flex items-center justify-center h-20 w-20 bg-gray-200 rounded-md text-gray-500">
+                      <ImageIcon className="h-10 w-10" />
                     </div>
                   )}
                   <div className="flex-grow">

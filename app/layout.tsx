@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter, Open_Sans, Playfair_Display } from 'next/font/google';
 import { ReduxProvider } from '@/components/providers/ReduxProvider';
 import { Toaster } from '@/components/ui/sonner';
+import { RealtimeBookingListener } from '@/components/RealtimeBooking';
 
 const open = Open_Sans({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -24,6 +25,7 @@ export default function RootLayout({
         <ReduxProvider>
           {children}
           <Toaster />
+          <RealtimeBookingListener />
         </ReduxProvider>
       </body>
     </html>

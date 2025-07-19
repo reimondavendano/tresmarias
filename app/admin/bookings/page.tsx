@@ -342,5 +342,6 @@ export default function AdminBookingsPage() {
         )}
       </div>
     </AdminLayout>
+    
   );
 }
