@@ -156,10 +156,6 @@ export const faqs = [
         answer: "Our rebonding treatments typically last between 6 to 12 months, depending on your hair's natural growth and how well you maintain it."
     },
     {
-        question: "What is the difference between basic and premium rebonding?",
-        answer: "Premium rebonding uses advanced formulas containing conditioning agents like keratin or collagen to minimize damage and add extra shine, whereas basic rebonding focuses primarily on straightening."
-    },
-    {
         question: "Do you use authentic products?",
         answer: "Yes, we strictly use 100% authentic and high-quality salon-grade products to ensure safety and the best results for your hair."
     },
